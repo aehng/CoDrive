@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">CoDrive</string>
-    <string name="main_status_text">CoDrive is ready. Enable accessibility service in Settings to continue.</string>
+    <string name="main_status_disabled">CoDrive accessibility service is OFF. Enable it in Accessibility settings.</string>
+    <string name="main_status_enabled">Accessibility service is ON. CoDrive is ready for the tracer bullet flow.</string>
+    <string name="open_accessibility_settings">Open Accessibility Settings</string>
     <string name="accessibility_service_description">CoDrive accessibility proxy</string>
     <string name="unreadable_screen_message">This screen is unreadable.</string>
     <string name="connection_lost_message">Connection lost. Pausing CoDrive.</string>
