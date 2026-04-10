@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">CoDrive</string>
+    <string name="accessibility_service_description">CoDrive accessibility proxy</string>
+    <string name="unreadable_screen_message">This screen is unreadable.</string>
+    <string name="connection_lost_message">Connection lost. Pausing CoDrive.</string>
+    <string name="connection_restored_message">Connection restored.</string>
 </resources>

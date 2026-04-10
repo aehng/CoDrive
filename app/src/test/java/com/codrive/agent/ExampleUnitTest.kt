@@ -1,5 +1,6 @@
-package com.codrive.agent
+package com.codrive.ai
 
+import com.codrive.ai.model.AgentPolicy
 import org.junit.Test
 
 import org.junit.Assert.*
@@ -11,7 +12,8 @@ import org.junit.Assert.*
  */
 class ExampleUnitTest {
     @Test
-    fun addition_isCorrect() {
-        assertEquals(4, 2 + 2)
+    fun policyThresholdIsConfiguredForTracerBulletSafety() {
+        assertEquals(0.8, AgentPolicy.confidenceClarificationThreshold, 0.0)
+        assertTrue(AgentPolicy.shouldClarify(0.79))
     }
 }
