@@ -5,16 +5,16 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String KEY_SETTINGS_PROMPT_SHOWN = "settings_prompt_shown";
-
     private TextView statusText;
-    private boolean settingsPromptShown;
+    private Button openSettingsButton;
+    private Button startChatButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,12 +22,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         statusText = findViewById(R.id.statusText);
-        Button openSettingsButton = findViewById(R.id.openSettingsButton);
+        openSettingsButton = findViewById(R.id.openSettingsButton);
         openSettingsButton.setOnClickListener(v -> openAccessibilitySettings());
 
-        if (savedInstanceState != null) {
-            settingsPromptShown = savedInstanceState.getBoolean(KEY_SETTINGS_PROMPT_SHOWN, false);
-        }
+        startChatButton = findViewById(R.id.startChatButton);
+        startChatButton.setOnClickListener(v -> openChat());
     }
 
     @Override
@@ -38,21 +37,18 @@ public class MainActivity extends AppCompatActivity {
                 ? R.string.main_status_enabled
                 : R.string.main_status_disabled);
 
-        // First-run onboarding: take the user straight to Accessibility settings.
-        if (!serviceEnabled && !settingsPromptShown) {
-            settingsPromptShown = true;
-            openAccessibilitySettings();
-        }
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        outState.putBoolean(KEY_SETTINGS_PROMPT_SHOWN, settingsPromptShown);
-        super.onSaveInstanceState(outState);
+        // Never auto-open settings. Keep user in-app and let them choose.
+        openSettingsButton.setVisibility(serviceEnabled ? View.GONE : View.VISIBLE);
+        startChatButton.setVisibility(serviceEnabled ? View.VISIBLE : View.GONE);
     }
 
     private void openAccessibilitySettings() {
         Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        startActivity(intent);
+    }
+
+    private void openChat() {
+        Intent intent = new Intent(this, com.codrive.ai.ChatActivity.class);
         startActivity(intent);
     }
 

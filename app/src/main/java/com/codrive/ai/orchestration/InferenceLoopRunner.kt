@@ -6,7 +6,7 @@ import com.codrive.ai.model.ActionType
 import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.PrunedUiMap
 
-class InferenceLoopRunner(
+class InferenceLoopRunner @JvmOverloads constructor(
     private val llmClient: LlmClient,
     private val memorySearchTool: MemorySearchTool,
     private val maxTurns: Int = 3,

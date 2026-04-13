@@ -1,6 +1,6 @@
 package com.codrive.ai.memory
 
-class MemorySearchTool(
+class MemorySearchTool @JvmOverloads constructor(
     private val identityDaoProvider: () -> IdentityDao?,
     private val sessionContextDaoProvider: () -> SessionContextDao?,
     private val nowProvider: () -> Long = System::currentTimeMillis,
