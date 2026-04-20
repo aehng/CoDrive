@@ -11,7 +11,7 @@ import androidx.room.Room;
 
 import com.codrive.ai.execution.AccessibilityActionExecutor;
 import com.codrive.ai.execution.AccessibilityRuntimeAdapter;
-import com.codrive.ai.llm.GroqLlmClient;
+import com.codrive.ai.llm.LlmClientFactory;
 import com.codrive.ai.memory.IdentityDatabase;
 import com.codrive.ai.memory.MemorySearchTool;
 import com.codrive.ai.model.ActionType;
@@ -19,6 +19,7 @@ import com.codrive.ai.model.AgentDecision;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
 import com.codrive.ai.orchestration.TracerBulletResult;
+import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
 import com.codrive.ai.accessibility.UiTreePruner;
 
@@ -33,6 +34,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private IdentityDatabase identityDatabase;
     private ExecutorService backgroundExecutor;
+    private LlmSettingsStore llmSettingsStore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +52,7 @@ public class ChatActivity extends AppCompatActivity {
                 IdentityDatabase.class,
                 "codrive_identity.db"
         ).build();
+        llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         backgroundExecutor = Executors.newSingleThreadExecutor();
 
         sendButton.setOnClickListener(v -> submitCommand());
@@ -106,7 +109,10 @@ public class ChatActivity extends AppCompatActivity {
                 () -> identityDatabase.sessionContextDao(),
                 System::currentTimeMillis
         );
-        InferenceLoopRunner loopRunner = new InferenceLoopRunner(new GroqLlmClient(), memorySearchTool);
+        InferenceLoopRunner loopRunner = new InferenceLoopRunner(
+                LlmClientFactory.create(llmSettingsStore),
+                memorySearchTool
+        );
 
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;
         ChatTracerBulletOrchestrator orchestrator = new ChatTracerBulletOrchestrator(

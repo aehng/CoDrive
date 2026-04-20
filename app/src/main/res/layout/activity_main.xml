@@ -21,6 +21,14 @@
         android:text="@string/open_accessibility_settings" />
 
     <Button
+        android:id="@+id/openLlmSettingsButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/open_llm_settings_button"
+        android:visibility="gone" />
+
+    <Button
         android:id="@+id/startChatButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

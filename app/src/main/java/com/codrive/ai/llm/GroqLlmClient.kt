@@ -24,11 +24,19 @@ fun interface GroqTransport {
 
 class GroqLlmClient(
     private val apiKey: String = BuildConfig.GROQ_API_KEY,
+    private val model: String = "qwen/qwen3-32b",
     private val parser: GroqDecisionParser = GroqDecisionParser(),
-    private val transport: GroqTransport = defaultTransport(BuildConfig.GROQ_API_KEY),
+    private val transport: GroqTransport = defaultTransport(apiKey),
     private val sleeper: (Long) -> Unit = { Thread.sleep(it) },
     private val jitterProvider: () -> Long = { Random.nextLong(0, 250) },
 ) : LlmClient {
+
+    constructor(apiKey: String, model: String) : this(
+        apiKey = apiKey,
+        model = model,
+        parser = GroqDecisionParser(),
+        transport = defaultTransport(apiKey),
+    )
 
     override fun infer(command: String, uiMap: PrunedUiMap): AgentDecision {
         if (apiKey.isBlank()) {
@@ -87,7 +95,7 @@ class GroqLlmClient(
 
     private fun buildRequestBody(command: String, uiMap: PrunedUiMap): String {
         val root = JSONObject()
-        root.put("model", "deepseek-r1-distill-qwen-32b")
+        root.put("model", model)
         root.put("temperature", 0)
         root.put("messages", JSONArray().apply {
             put(systemMessage())

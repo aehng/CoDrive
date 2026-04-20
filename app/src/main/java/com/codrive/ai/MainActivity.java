@@ -11,10 +11,14 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.codrive.ai.settings.LlmSettingsStore;
+
 public class MainActivity extends AppCompatActivity {
     private TextView statusText;
     private Button openSettingsButton;
+    private Button openLlmSettingsButton;
     private Button startChatButton;
+    private LlmSettingsStore llmSettingsStore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,21 +29,33 @@ public class MainActivity extends AppCompatActivity {
         openSettingsButton = findViewById(R.id.openSettingsButton);
         openSettingsButton.setOnClickListener(v -> openAccessibilitySettings());
 
+        openLlmSettingsButton = findViewById(R.id.openLlmSettingsButton);
+        openLlmSettingsButton.setOnClickListener(v -> openLlmSettings());
+
         startChatButton = findViewById(R.id.startChatButton);
         startChatButton.setOnClickListener(v -> openChat());
+
+        llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         boolean serviceEnabled = isAccessibilityServiceEnabled();
-        statusText.setText(serviceEnabled
-                ? R.string.main_status_enabled
-                : R.string.main_status_disabled);
+        boolean hasLlmKey = llmSettingsStore.hasApiKey();
 
         // Never auto-open settings. Keep user in-app and let them choose.
         openSettingsButton.setVisibility(serviceEnabled ? View.GONE : View.VISIBLE);
-        startChatButton.setVisibility(serviceEnabled ? View.VISIBLE : View.GONE);
+        openLlmSettingsButton.setVisibility(serviceEnabled ? View.VISIBLE : View.GONE);
+        startChatButton.setVisibility(serviceEnabled && hasLlmKey ? View.VISIBLE : View.GONE);
+
+        if (!serviceEnabled) {
+            statusText.setText(R.string.main_status_disabled);
+        } else if (!hasLlmKey) {
+            statusText.setText(R.string.main_status_needs_llm_key);
+        } else {
+            statusText.setText(R.string.main_status_enabled);
+        }
     }
 
     private void openAccessibilitySettings() {
@@ -49,6 +65,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void openChat() {
         Intent intent = new Intent(this, com.codrive.ai.ChatActivity.class);
+        startActivity(intent);
+    }
+
+    private void openLlmSettings() {
+        Intent intent = new Intent(this, com.codrive.ai.SettingsActivity.class);
         startActivity(intent);
     }
 
