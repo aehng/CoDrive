@@ -24,11 +24,8 @@
     <string name="settings_api_key_hint">Paste API key (hidden)</string>
     <string name="settings_key_preview_default">Current key: Not set</string>
     <string name="settings_key_preview_format">Current key: %1$s</string>
-    <string name="settings_save_button">Save and Continue</string>
-    <string name="settings_continue_anyway">Continue Anyway</string>
+    <string name="settings_save_button">Save LLM Settings</string>
     <string name="settings_status_idle">Update provider, model, or key and tap Save.</string>
     <string name="settings_saved">Saved. Runtime will use this provider/model for new requests.</string>
     <string name="settings_saved_provider_not_wired">Saved. Selected provider is not wired yet in tracer bullet; switch to Groq to run now.</string>
-    <string name="settings_validating">Validating key...</string>
-    <string name="settings_key_required">Enter an API key to continue.</string>
 </resources>

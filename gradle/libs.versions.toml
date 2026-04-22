@@ -7,6 +7,7 @@ espressoCore = "3.7.0"
 appcompat = "1.6.1"
 material = "1.10.0"
 kotlin = "2.1.10"
+ksp = "2.2.10-2.0.2"
 room = "2.7.0"
 json = "20240303"
 securityCrypto = "1.1.0-alpha06"
@@ -28,4 +29,5 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 

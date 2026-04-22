@@ -62,14 +62,6 @@
         android:layout_marginTop="16dp"
         android:text="@string/settings_save_button" />
 
-    <Button
-        android:id="@+id/settingsContinueAnywayButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/settings_continue_anyway"
-        android:visibility="gone" />
-
     <TextView
         android:id="@+id/settingsStatusText"
         android:layout_width="match_parent"

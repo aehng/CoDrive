@@ -69,11 +69,7 @@ class GroqLlmClient(
                     continue
                 }
 
-                if (statusCode == 429) {
-                    return clarification("I am rate-limited, retrying shortly.")
-                }
-
-                return clarification("I could not complete that request.")
+                return clarification(messageForHttpFailure(statusCode, responseBody))
             } catch (_: IOException) {
                 if (attempt < AgentPolicy.groqRetryAttempts) {
                     sleepBackoff(attempt)
@@ -114,9 +110,9 @@ class GroqLlmClient(
 
     private fun userMessage(command: String, uiMap: PrunedUiMap): JSONObject {
         val payload = JSONObject()
-            .put("command", command)
+            .put("command", command.trim())
             .put("snapshot_id", uiMap.snapshotId)
-            .put("ui_map", uiMap.entries.toUiJson())
+            .put("ui_map", uiMap.entries.toBudgetedUiJson())
             .put("token_budget_soft", AgentPolicy.groqSoftTokenBudget)
             .put("token_budget_hard", AgentPolicy.groqHardTokenBudget)
         return JSONObject()
@@ -165,21 +161,51 @@ class GroqLlmClient(
         confidenceScore = 0.0,
     )
 
-    private fun List<PrunedNodeEntry>.toUiJson(): JSONArray = JSONArray().apply {
-        for (entry in this@toUiJson) {
+    private fun List<PrunedNodeEntry>.toBudgetedUiJson(): JSONArray = JSONArray().apply {
+        for (entry in this@toBudgetedUiJson.take(MAX_UI_ENTRIES)) {
             put(JSONObject()
                 .put("index", entry.index)
                 .put("role", entry.role.name.lowercase())
                 .put("bounds", JSONArray(entry.boundsAsList()))
-                .put("text", entry.text ?: "")
-                .put("content_description", entry.contentDescription ?: "")
+                .put("text", (entry.text ?: "").take(MAX_TEXT_LENGTH))
+                .put("content_description", (entry.contentDescription ?: "").take(MAX_TEXT_LENGTH))
                 .put("interactive", entry.isInteractive)
             )
         }
     }
 
+    private fun messageForHttpFailure(statusCode: Int, responseBody: String): String {
+        val detail = extractErrorDetail(responseBody)
+        return when (statusCode) {
+            400 -> "Groq rejected the request. Try a smaller command or verify model name. $detail"
+            401, 403 -> "Groq API key was rejected. Update the key in LLM Settings. $detail"
+            404 -> "Groq model or endpoint was not found. Check provider/model in LLM Settings. $detail"
+            429 -> "I am rate-limited, retrying shortly. $detail"
+            in 500..599 -> "Groq is temporarily unavailable. Try again in a moment. $detail"
+            else -> "I could not complete that request (status=$statusCode). $detail"
+        }.trim()
+    }
+
+    private fun extractErrorDetail(responseBody: String): String {
+        if (responseBody.isBlank()) {
+            return ""
+        }
+        return runCatching {
+            val root = JSONObject(responseBody)
+            val message = root.optJSONObject("error")?.optString("message")
+                ?: root.optString("message")
+            message.orEmpty()
+        }.getOrDefault(responseBody)
+            .replace("\n", " ")
+            .trim()
+            .take(MAX_ERROR_LENGTH)
+    }
+
     companion object {
         private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+        private const val MAX_UI_ENTRIES = 80
+        private const val MAX_TEXT_LENGTH = 120
+        private const val MAX_ERROR_LENGTH = 220
 
         fun defaultTransport(apiKey: String): GroqTransport = GroqTransport { requestBody, timeoutMillis ->
             val connection = (URL(GROQ_URL).openConnection() as HttpURLConnection).apply {

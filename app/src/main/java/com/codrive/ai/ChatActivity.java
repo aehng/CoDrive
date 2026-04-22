@@ -5,6 +5,8 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
+import android.text.method.ScrollingMovementMethod;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.room.Room;
@@ -42,6 +44,9 @@ public class ChatActivity extends AppCompatActivity {
         setContentView(R.layout.activity_chat);
 
         outputText = findViewById(R.id.chatOutputText);
+        // Make the output scrollable so long messages (errors/debug) are visible.
+        outputText.setMovementMethod(new ScrollingMovementMethod());
+        outputText.setScrollBarSize(8);
         inputText = findViewById(R.id.chatInputText);
         sendButton = findViewById(R.id.chatSendButton);
 
@@ -84,7 +89,15 @@ public class ChatActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 sendButton.setEnabled(true);
                 inputText.setText("");
-                outputText.setText(result.getFinalFeedback());
+                String feedback = result.getFinalFeedback();
+                outputText.setText(feedback);
+                // ensure the content is visible (scroll to top)
+                outputText.post(() -> outputText.scrollTo(0, 0));
+
+                // show a short Toast for failures so it's visible even if layout clipping occurs
+                if (!result.getDidExecute()) {
+                    Toast.makeText(this, feedback, Toast.LENGTH_LONG).show();
+                }
             });
         });
     }
