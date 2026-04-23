@@ -6,7 +6,7 @@
 
 Package: `com.codrive.ai` | Target: Samsung S25 FE (8GB RAM) | SDK: Min 33 (Android 13), Target 35
 
-Last updated: 2026-04-18
+Last updated: 2026-04-23
 
 ## 1. Project Identity & Overview
 
@@ -36,6 +36,7 @@ User-provided API keys & model selection (Settings UX)
   - The Settings screen should allow choosing a provider (Groq, Gemini, OpenAI, Custom HTTP) and entering the model identifier string for that provider.
   - Implement a provider-adapter pattern in `LlmClient` so the runtime request wiring uses the selected provider/model and key without changing app logic.
   - On key entry, run a lightweight validation call and show success/failure in the UI (avoid expensive token-consuming requests during validation).
+  - Prompt contract: model output must be raw JSON only. Do not emit conversational text, explanations, or markdown blocks outside the JSON object.
 
 Security & UX guidance:
 
@@ -162,10 +163,18 @@ Follow phase-by-phase execution. The tracer bullet vertical slice is the immedia
 
 Phase 0 — Baseline: Manifest, permissions, accessibility config.
 Phase 1 — Core models/interfaces: `PrunedNodeEntry`, `PrunedUiMap`, `AgentDecision`, `ExecutionResult`, `SttEngine`, `TtsEngine`, `LlmClient`, `ActionExecutor`. Also add a Settings UI (secure API key entry, provider & model selection) and encrypted runtime storage for user keys.
-Phase 2 — Semantic pruner, registry, and unit tests.
-Phase 3 — Groq client and strict schema handling. Also implement `LlmClient` provider adapters and runtime wiring so the selected provider/model and encrypted key from Settings are used at request time.
-Phase 4 — Action execution with anti-stale checks and gesture dispatch.
-Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback).
+Phase 2 — Semantic pruner, registry, semantic merging, and unit tests.
+Phase 3 — Groq client, strict JSON-only handling, and runtime wiring so the selected provider/model and encrypted key from Settings are used at request time.
+Phase 4 — Action execution with anti-stale checks, focus-before-type behavior, and gesture/global-action dispatch.
+Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback) plus launcher-ready seams for a persistent overlay bubble.
+
+Immediate next implementation TODOs:
+- [ ] Add semantic merging to `UiTreePruner` so clickable containers absorb label text from immediate children.
+- [ ] Simplify the Groq system prompt to JSON-only output and keep the parser fail-closed.
+- [ ] Harden typing by forcing focus before `ACTION_SET_TEXT` when needed.
+- [ ] Route Tier 1 navigation through `performGlobalAction()` for Home / Back / Recents.
+- [ ] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`.
+
 
 Definition of Done (Tracer Bullet MVP):
 - A hardcoded trigger flows into the Pruner -> Groq -> strict JSON parse -> `node.refresh()` -> simulated `dispatchGesture` (on-device) with clear test steps and JUnit coverage.

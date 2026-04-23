@@ -51,9 +51,33 @@ class GroqLlmClientTest {
             .getString("content")
         val payload = JSONObject(userContent)
         val uiArray = payload.getJSONArray("ui_map")
+        val responseFormat = root.getJSONObject("response_format")
 
         assertTrue(uiArray.length() <= 80)
         assertTrue(uiArray.getJSONObject(0).getString("text").length <= 120)
+        assertEquals("json_object", responseFormat.getString("type"))
+        assertTrue(root.optJSONObject("response_format")?.has("json_schema") != true)
+    }
+
+    @Test
+    fun inferDoesNotRetryOnBadRequestFallbackPath() {
+        var calls = 0
+        val client = GroqLlmClient(
+            apiKey = "test-key",
+            transport = GroqTransport { _, _ ->
+                calls += 1
+                400 to "{\"error\":{\"message\":\"unsupported response format\"}}"
+            },
+            sleeper = {},
+            jitterProvider = { 0L },
+        )
+
+        val decision = client.infer("tap", sampleUiMap())
+
+        assertEquals(1, calls)
+        assertEquals(ActionType.FINISH, decision.actionType)
+        assertTrue(decision.requiresClarification())
+        assertTrue(decision.voiceFeedback.contains("Groq rejected the request"))
     }
 
     @Test
