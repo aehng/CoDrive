@@ -4,9 +4,11 @@ import com.codrive.ai.accessibility.NodeRegistry
 
 interface UiActionNode {
     val isVisibleToUser: Boolean
+    val isFocused: Boolean
     val bounds: IntArray
 
     fun refresh(): Boolean
+    fun focus(): Boolean
     fun setText(value: String): Boolean
     fun scrollForward(): Boolean
     fun scrollBackward(): Boolean

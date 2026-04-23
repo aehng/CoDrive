@@ -20,6 +20,9 @@ class AccessibilityRuntimeAdapter(
             override val isVisibleToUser: Boolean
                 get() = node.isVisibleToUser
 
+            override val isFocused: Boolean
+                get() = node.isFocused
+
             override val bounds: IntArray
                 get() {
                     val rect = android.graphics.Rect()
@@ -28,6 +31,8 @@ class AccessibilityRuntimeAdapter(
                 }
 
             override fun refresh(): Boolean = node.refresh()
+
+            override fun focus(): Boolean = node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
 
             override fun setText(value: String): Boolean {
                 val args = Bundle()

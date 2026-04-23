@@ -175,7 +175,6 @@ Phase 4 — Action execution with anti-stale checks, focus-before-type behavior,
 Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback) plus launcher-ready seams for a persistent overlay bubble.
 
 Immediate next implementation TODOs:
-- [ ] Harden typing by forcing focus before `ACTION_SET_TEXT` when needed.
 - [ ] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`.
 
 

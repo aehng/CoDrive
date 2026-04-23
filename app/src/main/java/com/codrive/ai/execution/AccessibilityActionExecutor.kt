@@ -50,6 +50,16 @@ class AccessibilityActionExecutor(
         val node = resolveFreshVisibleNode(decision.targetIndex)
             ?: return staleNodeFailure(decision.targetIndex)
 
+        val focused = node.isFocused || node.focus()
+        if (!focused) {
+            return ExecutionResult(
+                success = false,
+                message = "Failed to focus target ${decision.targetIndex} before typing.",
+                performedAction = ActionType.TYPE,
+                targetIndex = decision.targetIndex,
+            )
+        }
+
         val success = node.setText(decision.textToType)
         return ExecutionResult(
             success = success,
