@@ -2,6 +2,7 @@ package com.codrive.ai;
 
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -37,6 +38,8 @@ public class ChatActivity extends AppCompatActivity {
     private IdentityDatabase identityDatabase;
     private ExecutorService backgroundExecutor;
     private LlmSettingsStore llmSettingsStore;
+
+    private static final String TAG = "ChatActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,21 +88,41 @@ public class ChatActivity extends AppCompatActivity {
         outputText.setText(R.string.chat_running_command);
 
         backgroundExecutor.execute(() -> {
-            TracerBulletResult result = runTracerBullet(command);
+            TracerBulletResult result;
+            try {
+                result = runTracerBullet(command);
+            } catch (Exception error) {
+                Log.e(TAG, "Tracer bullet failed", error);
+                result = unexpectedFailureResult(error);
+            }
+            final TracerBulletResult finalResult = result;
             runOnUiThread(() -> {
                 sendButton.setEnabled(true);
                 inputText.setText("");
-                String feedback = result.getFinalFeedback();
+                String feedback = finalResult.getFinalFeedback();
                 outputText.setText(feedback);
                 // ensure the content is visible (scroll to top)
                 outputText.post(() -> outputText.scrollTo(0, 0));
 
                 // show a short Toast for failures so it's visible even if layout clipping occurs
-                if (!result.getDidExecute()) {
+                if (!finalResult.getDidExecute()) {
                     Toast.makeText(this, feedback, Toast.LENGTH_LONG).show();
                 }
             });
         });
+    }
+
+    private TracerBulletResult unexpectedFailureResult(Exception error) {
+        String message = error.getMessage();
+        if (TextUtils.isEmpty(message)) {
+            message = getString(R.string.chat_generic_error_message);
+        }
+        return new TracerBulletResult(
+                message,
+                new AgentDecision(ActionType.FINISH, -1, "", "", "", 0.0),
+                null,
+                false
+        );
     }
 
     private TracerBulletResult runTracerBullet(String command) {
@@ -137,6 +160,3 @@ public class ChatActivity extends AppCompatActivity {
         return orchestrator.run(command, pruner.prune(service.getLatestRootNode(), System.currentTimeMillis()));
     }
 }
-
-
-

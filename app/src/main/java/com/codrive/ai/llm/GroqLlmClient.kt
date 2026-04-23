@@ -43,7 +43,8 @@ class GroqLlmClient(
             return clarification("Groq is not configured yet.")
         }
 
-        val requestBody = buildRequestBody(command, uiMap)
+        var useStructuredOutput = true
+        var requestBody = buildRequestBody(command, uiMap, useStructuredOutput)
 
         var attempt = 0
         while (attempt <= AgentPolicy.groqRetryAttempts) {
@@ -55,6 +56,13 @@ class GroqLlmClient(
 
                 if (statusCode in 200..299) {
                     return parser.parse(responseBody)
+                }
+
+                if (statusCode == 400 && useStructuredOutput && isUnsupportedJsonSchema(responseBody)) {
+                    // Some Groq models do not support json_schema. Retry once with prompt-only JSON mode.
+                    useStructuredOutput = false
+                    requestBody = buildRequestBody(command, uiMap, useStructuredOutput)
+                    continue
                 }
 
                 if (statusCode == 429 && attempt < AgentPolicy.groqRetryAttempts) {
@@ -89,23 +97,32 @@ class GroqLlmClient(
         sleeper(delay)
     }
 
-    private fun buildRequestBody(command: String, uiMap: PrunedUiMap): String {
+    private fun buildRequestBody(command: String, uiMap: PrunedUiMap, useStructuredOutput: Boolean): String {
         val root = JSONObject()
         root.put("model", model)
         root.put("temperature", 0)
         root.put("messages", JSONArray().apply {
-            put(systemMessage())
+            put(systemMessage(useStructuredOutput))
             put(userMessage(command, uiMap))
         })
-        root.put("response_format", strictResponseFormat())
+        if (useStructuredOutput) {
+            root.put("response_format", strictResponseFormat())
+        }
         return root.toString()
     }
 
-    private fun systemMessage(): JSONObject = JSONObject()
+    private fun systemMessage(useStructuredOutput: Boolean): JSONObject = JSONObject()
         .put("role", "system")
         .put(
             "content",
-            "You are CoDrive. Return only strict JSON matching schema. Limit reasoning to 2 sentences max."
+            if (useStructuredOutput) {
+                "You are CoDrive. Return only strict JSON matching schema. Limit reasoning to 2 sentences max."
+            } else {
+                "You are CoDrive. Return exactly one JSON object only, no markdown or prose. " +
+                    "Required keys: action_type,target_index,text_to_type,tool_query,voice_feedback,confidence_score. " +
+                    "Allowed action_type values: CLICK,TYPE,SCROLL,SEARCH_MEMORY,FINISH. " +
+                    "Limit reasoning to 2 sentences max."
+            }
         )
 
     private fun userMessage(command: String, uiMap: PrunedUiMap): JSONObject {
@@ -184,6 +201,11 @@ class GroqLlmClient(
             in 500..599 -> "Groq is temporarily unavailable. Try again in a moment. $detail"
             else -> "I could not complete that request (status=$statusCode). $detail"
         }.trim()
+    }
+
+    private fun isUnsupportedJsonSchema(responseBody: String): Boolean {
+        val lower = responseBody.lowercase()
+        return lower.contains("does not support response format") && lower.contains("json_schema")
     }
 
     private fun extractErrorDetail(responseBody: String): String {
