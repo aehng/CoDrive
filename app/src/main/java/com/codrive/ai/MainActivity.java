@@ -5,11 +5,17 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.PopupMenu;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.codrive.ai.settings.LlmSettingsStore;
 
@@ -25,6 +31,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        View mainRoot = findViewById(R.id.mainRoot);
+        configureInsets(mainRoot);
+
         statusText = findViewById(R.id.statusText);
         openSettingsButton = findViewById(R.id.openSettingsButton);
         openSettingsButton.setOnClickListener(v -> openAccessibilitySettings());
@@ -34,6 +43,9 @@ public class MainActivity extends AppCompatActivity {
 
         startChatButton = findViewById(R.id.startChatButton);
         startChatButton.setOnClickListener(v -> openChat());
+
+        ImageButton menuButton = findViewById(R.id.mainMenuButton);
+        menuButton.setOnClickListener(this::showNavigationMenu);
 
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
     }
@@ -92,6 +104,41 @@ public class MainActivity extends AppCompatActivity {
         }
         return false;
     }
+
+    private void configureInsets(View root) {
+        final int baseBottom = root.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(
+                    view.getPaddingLeft(),
+                    view.getPaddingTop(),
+                    view.getPaddingRight(),
+                    baseBottom + bars.bottom
+            );
+            return insets;
+        });
+    }
+
+    private void showNavigationMenu(View anchor) {
+        PopupMenu popupMenu = new PopupMenu(this, anchor);
+        popupMenu.getMenuInflater().inflate(R.menu.chat_navigation_menu, popupMenu.getMenu());
+        popupMenu.setOnMenuItemClickListener(this::onNavigationItemClicked);
+        popupMenu.show();
+    }
+
+    private boolean onNavigationItemClicked(MenuItem item) {
+        int itemId = item.getItemId();
+        if (itemId == R.id.menu_chat_home) {
+            return true;
+        }
+        if (itemId == R.id.menu_chat_chat) {
+            openChat();
+            return true;
+        }
+        if (itemId == R.id.menu_chat_settings) {
+            openLlmSettings();
+            return true;
+        }
+        return false;
+    }
 }
-
-

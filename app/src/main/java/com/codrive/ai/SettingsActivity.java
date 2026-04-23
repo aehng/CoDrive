@@ -1,14 +1,22 @@
 package com.codrive.ai;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.MenuItem;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.codrive.ai.settings.LlmProvider;
 import com.codrive.ai.settings.LlmSettingsStore;
@@ -26,12 +34,19 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
+        View settingsRoot = findViewById(R.id.settingsRoot);
+        View settingsContent = findViewById(R.id.settingsContent);
+        configureInsets(settingsRoot, settingsContent);
+
         providerSpinner = findViewById(R.id.settingsProviderSpinner);
         modelInput = findViewById(R.id.settingsModelInput);
         apiKeyInput = findViewById(R.id.settingsApiKeyInput);
         keyPreview = findViewById(R.id.settingsKeyPreview);
         statusText = findViewById(R.id.settingsStatusText);
         Button saveButton = findViewById(R.id.settingsSaveButton);
+        ImageButton menuButton = findViewById(R.id.settingsMenuButton);
+
+        menuButton.setOnClickListener(this::showNavigationMenu);
 
         settingsStore = LlmSettingsStore.create(getApplicationContext());
 
@@ -81,5 +96,48 @@ public class SettingsActivity extends AppCompatActivity {
 
         statusText.setText(R.string.settings_saved);
     }
-}
 
+    private void configureInsets(View root, View content) {
+        final int baseRootBottom = root.getPaddingBottom();
+        final int baseContentBottom = content.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(
+                    view.getPaddingLeft(),
+                    view.getPaddingTop(),
+                    view.getPaddingRight(),
+                    baseRootBottom
+            );
+            content.setPadding(
+                    content.getPaddingLeft(),
+                    content.getPaddingTop(),
+                    content.getPaddingRight(),
+                    baseContentBottom + bars.bottom
+            );
+            return insets;
+        });
+    }
+
+    private void showNavigationMenu(View anchor) {
+        PopupMenu popupMenu = new PopupMenu(this, anchor);
+        popupMenu.getMenuInflater().inflate(R.menu.chat_navigation_menu, popupMenu.getMenu());
+        popupMenu.setOnMenuItemClickListener(this::onNavigationItemClicked);
+        popupMenu.show();
+    }
+
+    private boolean onNavigationItemClicked(MenuItem item) {
+        int itemId = item.getItemId();
+        if (itemId == R.id.menu_chat_home) {
+            startActivity(new Intent(this, MainActivity.class));
+            return true;
+        }
+        if (itemId == R.id.menu_chat_chat) {
+            startActivity(new Intent(this, ChatActivity.class));
+            return true;
+        }
+        if (itemId == R.id.menu_chat_settings) {
+            return true;
+        }
+        return false;
+    }
+}

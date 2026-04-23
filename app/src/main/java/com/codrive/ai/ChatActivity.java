@@ -1,15 +1,23 @@
 package com.codrive.ai;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MenuItem;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.PopupMenu;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.text.method.ScrollingMovementMethod;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.room.Room;
 
 import com.codrive.ai.execution.AccessibilityActionExecutor;
@@ -34,6 +42,7 @@ public class ChatActivity extends AppCompatActivity {
     private TextView outputText;
     private EditText inputText;
     private Button sendButton;
+    private ScrollView outputScroll;
 
     private IdentityDatabase identityDatabase;
     private ExecutorService backgroundExecutor;
@@ -46,12 +55,16 @@ public class ChatActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
+        View chatRoot = findViewById(R.id.chatRoot);
+        View composerContainer = findViewById(R.id.chatComposerContainer);
+        outputScroll = findViewById(R.id.chatOutputScroll);
         outputText = findViewById(R.id.chatOutputText);
-        // Make the output scrollable so long messages (errors/debug) are visible.
-        outputText.setMovementMethod(new ScrollingMovementMethod());
-        outputText.setScrollBarSize(8);
         inputText = findViewById(R.id.chatInputText);
         sendButton = findViewById(R.id.chatSendButton);
+        ImageButton menuButton = findViewById(R.id.chatMenuButton);
+
+        configureInsets(chatRoot, composerContainer);
+        menuButton.setOnClickListener(this::showNavigationMenu);
 
         outputText.setText(R.string.chat_ready_message);
 
@@ -80,12 +93,12 @@ public class ChatActivity extends AppCompatActivity {
     private void submitCommand() {
         final String command = inputText.getText().toString().trim();
         if (TextUtils.isEmpty(command)) {
-            outputText.setText(R.string.chat_enter_command_first);
+            Toast.makeText(this, R.string.chat_enter_command_first, Toast.LENGTH_SHORT).show();
             return;
         }
 
+        appendLine(getString(R.string.chat_you_prefix), command);
         sendButton.setEnabled(false);
-        outputText.setText(R.string.chat_running_command);
 
         backgroundExecutor.execute(() -> {
             TracerBulletResult result;
@@ -99,17 +112,84 @@ public class ChatActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 sendButton.setEnabled(true);
                 inputText.setText("");
-                String feedback = finalResult.getFinalFeedback();
-                outputText.setText(feedback);
-                // ensure the content is visible (scroll to top)
-                outputText.post(() -> outputText.scrollTo(0, 0));
+                renderResult(finalResult);
 
-                // show a short Toast for failures so it's visible even if layout clipping occurs
+                String feedback = finalResult.getFinalFeedback();
                 if (!finalResult.getDidExecute()) {
                     Toast.makeText(this, feedback, Toast.LENGTH_LONG).show();
                 }
             });
         });
+    }
+
+    private void renderResult(TracerBulletResult result) {
+        appendLine(getString(R.string.chat_codrive_prefix), result.getFinalFeedback());
+        if (result.getExecutionResult() != null) {
+            String actionSummary = result.getExecutionResult().getMessage();
+            appendLine(getString(R.string.chat_action_prefix), actionSummary);
+        }
+        scrollTranscriptToBottom();
+    }
+
+    private void appendLine(String prefix, String message) {
+        String safeMessage = message == null ? "" : message.trim();
+        if (safeMessage.isEmpty()) {
+            safeMessage = getString(R.string.chat_generic_error_message);
+        }
+        if (outputText.length() > 0) {
+            outputText.append("\n\n");
+        }
+        outputText.append(prefix);
+        outputText.append(" ");
+        outputText.append(safeMessage);
+    }
+
+    private void scrollTranscriptToBottom() {
+        outputScroll.post(() -> outputScroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void configureInsets(View root, View composerContainer) {
+        final int baseRootBottom = root.getPaddingBottom();
+        final int baseComposerBottom = composerContainer.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(
+                    view.getPaddingLeft(),
+                    view.getPaddingTop(),
+                    view.getPaddingRight(),
+                    baseRootBottom
+            );
+            composerContainer.setPadding(
+                    composerContainer.getPaddingLeft(),
+                    composerContainer.getPaddingTop(),
+                    composerContainer.getPaddingRight(),
+                    baseComposerBottom + bars.bottom
+            );
+            return insets;
+        });
+    }
+
+    private void showNavigationMenu(View anchor) {
+        PopupMenu popupMenu = new PopupMenu(this, anchor);
+        popupMenu.getMenuInflater().inflate(R.menu.chat_navigation_menu, popupMenu.getMenu());
+        popupMenu.setOnMenuItemClickListener(this::onNavigationItemClicked);
+        popupMenu.show();
+    }
+
+    private boolean onNavigationItemClicked(MenuItem item) {
+        int itemId = item.getItemId();
+        if (itemId == R.id.menu_chat_home) {
+            startActivity(new Intent(this, MainActivity.class));
+            return true;
+        }
+        if (itemId == R.id.menu_chat_chat) {
+            return true;
+        }
+        if (itemId == R.id.menu_chat_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        }
+        return false;
     }
 
     private TracerBulletResult unexpectedFailureResult(Exception error) {
