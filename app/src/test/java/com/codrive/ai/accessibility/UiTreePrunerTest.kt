@@ -65,6 +65,7 @@ class UiTreePrunerTest {
         assertEquals(4, outcome.uiMap.entries.size)
         assertEquals(listOf(0, 1, 2, 3), outcome.uiMap.entries.map { it.index })
         assertEquals(UiRole.BUTTON, outcome.uiMap.entries[0].role)
+        assertEquals("Home Static label", outcome.uiMap.entries[0].text)
         assertEquals(UiRole.INPUT, outcome.uiMap.entries[1].role)
         assertEquals(UiRole.TEXT, outcome.uiMap.entries[2].role)
         assertEquals(UiRole.CHECKBOX, outcome.uiMap.entries[3].role)
@@ -95,6 +96,47 @@ class UiTreePrunerTest {
         assertEquals(2, outcome.uiMap.entries.size)
         assertEquals("This screen is unreadable.", outcome.unreadableMessage)
         assertEquals(0, outcome.nodeRegistry.size())
+    }
+
+    @Test
+    fun pruneMergesImmediateChildLabelsIntoClickableParentText() {
+        val label = FakeNode(
+            text = "Child label",
+            screenBounds = intArrayOf(5, 5, 15, 15),
+        )
+        val root = FakeNode(
+            contentDescription = "Parent",
+            isClickable = true,
+            children = listOf(label),
+        )
+
+        val outcome = UiTreePruner().prune(root, snapshotId = 10L)
+
+        assertFalse(outcome.isUnreadable)
+        assertEquals(2, outcome.uiMap.entries.size)
+        assertEquals("Parent Child label", outcome.uiMap.entries[0].text)
+        assertEquals("Parent", outcome.uiMap.entries[0].contentDescription)
+    }
+
+    @Test
+    fun pruneDoesNotMergeInteractiveChildLabelsIntoClickableParentText() {
+        val interactiveChild = FakeNode(
+            text = "Do not absorb",
+            isClickable = true,
+            screenBounds = intArrayOf(5, 5, 15, 15),
+        )
+        val root = FakeNode(
+            text = "Parent",
+            isClickable = true,
+            children = listOf(interactiveChild),
+        )
+
+        val outcome = UiTreePruner().prune(root, snapshotId = 11L)
+
+        assertFalse(outcome.isUnreadable)
+        assertEquals(2, outcome.uiMap.entries.size)
+        assertEquals("Parent", outcome.uiMap.entries[0].text)
+        assertEquals("Do not absorb", outcome.uiMap.entries[1].text)
     }
 }
 

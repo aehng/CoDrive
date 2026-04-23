@@ -2,6 +2,7 @@ package com.codrive.ai.model
 
 object AgentPolicy {
     const val confidenceClarificationThreshold: Double = 0.8
+    const val activeSessionTimeoutMillis: Long = 30_000L
     const val groqRequestTimeoutMillis: Long = 12_000L
     const val groqRetryAttempts: Int = 1
     const val groqRetryBackoffMillis: Long = 600L
@@ -16,6 +17,7 @@ enum class ActionType {
     TYPE,
     SCROLL,
     SEARCH_MEMORY,
+    RESPOND,
     FINISH,
 }
 

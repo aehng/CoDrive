@@ -52,11 +52,15 @@ class GroqLlmClientTest {
         val payload = JSONObject(userContent)
         val uiArray = payload.getJSONArray("ui_map")
         val responseFormat = root.getJSONObject("response_format")
+        val systemPrompt = root.getJSONArray("messages")
+            .getJSONObject(0)
+            .getString("content")
 
         assertTrue(uiArray.length() <= 80)
         assertTrue(uiArray.getJSONObject(0).getString("text").length <= 120)
         assertEquals("json_object", responseFormat.getString("type"))
         assertTrue(root.optJSONObject("response_format")?.has("json_schema") != true)
+        assertTrue(systemPrompt.contains("RESPOND"))
     }
 
     @Test

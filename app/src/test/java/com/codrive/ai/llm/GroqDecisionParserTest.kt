@@ -63,5 +63,26 @@ class GroqDecisionParserTest {
 
         assertEquals("{\"a\":1,\"b\":{\"c\":2}}", extracted)
     }
+
+    @Test
+    fun parseAcceptsLowercaseRespondActionType() {
+        val parser = GroqDecisionParser()
+        val response = """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "{\"action_type\":\"respond\",\"target_index\":0,\"text_to_type\":\"\",\"tool_query\":\"\",\"voice_feedback\":\"Hi there\",\"confidence_score\":0.93}"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val decision = parser.parse(response)
+
+        assertEquals(ActionType.RESPOND, decision.actionType)
+        assertEquals("Hi there", decision.voiceFeedback)
+    }
 }
 

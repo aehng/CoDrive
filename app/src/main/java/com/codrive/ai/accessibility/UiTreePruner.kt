@@ -34,14 +34,20 @@ class UiTreePruner(
                 return
             }
 
+            val immediateChildren = mutableListOf<UiNodeSnapshot>()
+            for (childIndex in 0 until node.childCount) {
+                node.childAt(childIndex)?.let(immediateChildren::add)
+            }
+
             val shouldKeep = shouldKeep(node)
             if (shouldKeep) {
                 val entryIndex = crawlIndex++
+                val mergedText = mergedClickableLabel(node, immediateChildren)
                 val entry = PrunedNodeEntry(
                     index = entryIndex,
                     role = roleFor(node),
                     bounds = node.bounds.copyOf(),
-                    text = node.text?.toString(),
+                    text = mergedText ?: node.text?.toString(),
                     contentDescription = node.contentDescription?.toString(),
                     isInteractive = isInteractive(node),
                 )
@@ -49,8 +55,7 @@ class UiTreePruner(
                 node.liveNode?.let { nodeRegistry.register(entryIndex, it) }
             }
 
-            for (childIndex in 0 until node.childCount) {
-                val child = node.childAt(childIndex) ?: continue
+            for (child in immediateChildren) {
                 dfs(child, recycleSelf = true)
             }
 
@@ -88,6 +93,26 @@ class UiTreePruner(
         node.isCheckable -> UiRole.CHECKBOX
         node.isClickable -> UiRole.BUTTON
         else -> UiRole.TEXT
+    }
+
+    private fun mergedClickableLabel(node: UiNodeSnapshot, immediateChildren: List<UiNodeSnapshot>): String? {
+        if (!node.isClickable) {
+            return null
+        }
+
+        val parts = mutableListOf<String>()
+        node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
+        node.contentDescription?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
+
+        for (child in immediateChildren) {
+            if (!child.isVisibleToUser || isInteractive(child)) {
+                continue
+            }
+            child.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
+            child.contentDescription?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
+        }
+
+        return parts.distinct().joinToString(" ").trim().takeIf { it.isNotEmpty() }
     }
 
     private fun AccessibilityNodeInfo.asSnapshot(): UiNodeSnapshot = object : UiNodeSnapshot {

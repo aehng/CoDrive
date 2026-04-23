@@ -109,5 +109,20 @@ class AccessibilityActionExecutorTest {
         assertTrue(result.success)
         assertEquals(listOf(1, 2, 3, 4), runtime.clickedBounds?.toList())
     }
+
+    @Test
+    fun respondSkipsUiAction() {
+        val runtime = FakeRuntime()
+        val executor = AccessibilityActionExecutor(runtime)
+
+        val result = executor.execute(
+            AgentDecision(actionType = ActionType.RESPOND, confidenceScore = 0.95),
+            PrunedUiMap(1L, emptyList()),
+        )
+
+        assertTrue(result.success)
+        assertEquals(ActionType.RESPOND, result.performedAction)
+        assertEquals(null, runtime.clickedBounds)
+    }
 }
 

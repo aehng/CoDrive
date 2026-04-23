@@ -32,6 +32,20 @@ class ChatTracerBulletOrchestrator(
         registryBinder.bindRegistry(pruningOutcome.nodeRegistry)
         val decision = decisionRunner.apply(command, pruningOutcome.uiMap)
 
+        if (decision.actionType == ActionType.RESPOND) {
+            val message = if (decision.voiceFeedback.isNotBlank()) {
+                decision.voiceFeedback
+            } else {
+                "I am listening."
+            }
+            return TracerBulletResult(
+                finalFeedback = message,
+                decision = decision,
+                executionResult = null,
+                didExecute = false,
+            )
+        }
+
         if (decision.requiresClarification()) {
             val message = if (decision.voiceFeedback.isNotBlank()) {
                 decision.voiceFeedback

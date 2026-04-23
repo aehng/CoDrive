@@ -15,6 +15,11 @@ class AccessibilityActionExecutor(
             ActionType.CLICK -> executeClick(decision)
             ActionType.TYPE -> executeType(decision)
             ActionType.SCROLL -> executeScroll(decision)
+            ActionType.RESPOND -> ExecutionResult(
+                success = true,
+                message = "Responded without UI action.",
+                performedAction = ActionType.RESPOND,
+            )
             ActionType.FINISH -> ExecutionResult(
                 success = true,
                 message = "Finished without UI action.",

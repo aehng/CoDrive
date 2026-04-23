@@ -58,7 +58,7 @@ class GroqDecisionParser(
     }
 
     private fun parseActionType(value: String): ActionType? = runCatching {
-        ActionType.valueOf(value)
+        ActionType.valueOf(value.trim().uppercase())
     }.getOrNull()
 
     private fun failClosed(): AgentDecision = AgentDecision(

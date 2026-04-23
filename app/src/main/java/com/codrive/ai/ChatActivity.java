@@ -20,6 +20,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.room.Room;
 
+import com.codrive.ai.R;
 import com.codrive.ai.execution.AccessibilityActionExecutor;
 import com.codrive.ai.execution.AccessibilityRuntimeAdapter;
 import com.codrive.ai.llm.LlmClientFactory;
@@ -27,8 +28,12 @@ import com.codrive.ai.memory.IdentityDatabase;
 import com.codrive.ai.memory.MemorySearchTool;
 import com.codrive.ai.model.ActionType;
 import com.codrive.ai.model.AgentDecision;
+import com.codrive.ai.model.ExecutionResult;
+import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
+import com.codrive.ai.orchestration.Tier1NavigationDirective;
+import com.codrive.ai.orchestration.Tier1NavigationRouter;
 import com.codrive.ai.orchestration.TracerBulletResult;
 import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
@@ -47,6 +52,7 @@ public class ChatActivity extends AppCompatActivity {
     private IdentityDatabase identityDatabase;
     private ExecutorService backgroundExecutor;
     private LlmSettingsStore llmSettingsStore;
+    private ActiveSessionManager activeSessionManager;
 
     private static final String TAG = "ChatActivity";
 
@@ -74,6 +80,7 @@ public class ChatActivity extends AppCompatActivity {
                 "codrive_identity.db"
         ).build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
+        activeSessionManager = new ActiveSessionManager();
         backgroundExecutor = Executors.newSingleThreadExecutor();
 
         sendButton.setOnClickListener(v -> submitCommand());
@@ -216,6 +223,36 @@ public class ChatActivity extends AppCompatActivity {
             );
         }
 
+        String sessionAwareCommand = activeSessionManager.beginTurn(command);
+
+        Tier1NavigationRouter tier1NavigationRouter = new Tier1NavigationRouter();
+        Tier1NavigationDirective navigationDirective = tier1NavigationRouter.match(command);
+        if (navigationDirective != null) {
+            boolean success = service.performGlobalAction(navigationDirective.getGlobalAction());
+            String message = success ? navigationDirective.getVoiceFeedback() : "Failed to perform the requested navigation.";
+            if (success) {
+                activeSessionManager.clear();
+            }
+            return new TracerBulletResult(
+                    message,
+                    new AgentDecision(
+                            ActionType.FINISH,
+                            -1,
+                            "",
+                            "",
+                            message,
+                            success ? 1.0 : 0.0
+                    ),
+                    new ExecutionResult(
+                            success,
+                            message,
+                            ActionType.FINISH,
+                            -1
+                    ),
+                    success
+            );
+        }
+
         UiTreePruner pruner = new UiTreePruner();
         AccessibilityRuntimeAdapter runtimeAdapter = new AccessibilityRuntimeAdapter(service);
         AccessibilityActionExecutor actionExecutor = new AccessibilityActionExecutor(runtimeAdapter);
@@ -237,6 +274,11 @@ public class ChatActivity extends AppCompatActivity {
                 runtimeAdapter::bindRegistry
         );
 
-        return orchestrator.run(command, pruner.prune(service.getLatestRootNode(), System.currentTimeMillis()));
+        TracerBulletResult result = orchestrator.run(
+                sessionAwareCommand,
+                pruner.prune(service.getLatestRootNode(), System.currentTimeMillis())
+        );
+        activeSessionManager.onDecision(result.getDecision(), result.getDidExecute());
+        return result;
     }
 }

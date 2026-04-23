@@ -59,7 +59,7 @@ Operational Constraints
 Strict JSON Schema (strict: true)
 
 {
-  "action_type": "CLICK | TYPE | SCROLL | SEARCH_MEMORY | FINISH",
+  "action_type": "CLICK | TYPE | SCROLL | SEARCH_MEMORY | RESPOND | FINISH",
   "target_index": 0,
   "text_to_type": "string",
   "tool_query": "string",
@@ -139,6 +139,12 @@ Tier 1 (Local): Local regex router for simple commands (Go Home, Back, Scroll).
 Tier 2 (Cloud): Full scrape + Groq decision.
 Tier 3 (VLM Fallback): If scraper finds zero interactable nodes, use local VLM to ground coordinates.
 
+Active session continuity (implemented):
+- Keep a short-lived in-memory conversation buffer between mic taps.
+- Session timeout: 30 seconds of inactivity, then clear context.
+- Persist history for clarification or conversational `RESPOND` turns.
+- Clear history after successful physical execution or terminal completion.
+
 ## 8. Tier 3: VLM Fallback Path
 
 Model: Qwen2-VL-0.5B-Instruct (INT4 quantized locally).
@@ -169,10 +175,7 @@ Phase 4 — Action execution with anti-stale checks, focus-before-type behavior,
 Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback) plus launcher-ready seams for a persistent overlay bubble.
 
 Immediate next implementation TODOs:
-- [ ] Add semantic merging to `UiTreePruner` so clickable containers absorb label text from immediate children.
-- [ ] Simplify the Groq system prompt to JSON-only output and keep the parser fail-closed.
 - [ ] Harden typing by forcing focus before `ACTION_SET_TEXT` when needed.
-- [ ] Route Tier 1 navigation through `performGlobalAction()` for Home / Back / Recents.
 - [ ] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`.
 
 

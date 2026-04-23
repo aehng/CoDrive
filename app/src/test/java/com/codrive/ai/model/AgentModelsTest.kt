@@ -11,6 +11,7 @@ class AgentModelsTest {
     @Test
     fun policyThresholdMatchesMission() {
         assertEquals(0.8, AgentPolicy.confidenceClarificationThreshold, 0.0)
+        assertEquals(30_000L, AgentPolicy.activeSessionTimeoutMillis)
         assertTrue(AgentPolicy.shouldClarify(0.79))
         assertFalse(AgentPolicy.shouldClarify(0.8))
     }
@@ -19,6 +20,7 @@ class AgentModelsTest {
     fun actionTypeEnumerationContainsTracerBulletActions() {
         assertEquals(ActionType.CLICK, ActionType.valueOf("CLICK"))
         assertEquals(ActionType.SEARCH_MEMORY, ActionType.valueOf("SEARCH_MEMORY"))
+        assertEquals(ActionType.RESPOND, ActionType.valueOf("RESPOND"))
         assertEquals(ActionType.FINISH, ActionType.valueOf("FINISH"))
     }
 

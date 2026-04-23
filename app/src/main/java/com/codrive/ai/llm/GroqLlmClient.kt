@@ -102,7 +102,13 @@ class GroqLlmClient(
 
     private fun systemMessage(): JSONObject = JSONObject()
         .put("role", "system")
-        .put("content", "You are CoDrive. Return ONLY the raw JSON object. Do not include any conversational text, explanations, or markdown blocks outside of the JSON.")
+        .put(
+            "content",
+            "You are CoDrive. Return ONLY the raw JSON object. Do not include conversational text, explanations, or markdown outside JSON. " +
+                "Use action_type CLICK, TYPE, SCROLL, SEARCH_MEMORY, RESPOND, or FINISH. " +
+                "If the user is chatting, asking a general question, or you need clarification, use RESPOND with voice_feedback and target_index=0. " +
+                "If the user requests a physical UI operation, use CLICK/TYPE/SCROLL with the best target_index."
+        )
 
     private fun userMessage(command: String, uiMap: PrunedUiMap): JSONObject {
         val payload = JSONObject()

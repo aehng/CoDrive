@@ -117,6 +117,35 @@ class ChatTracerBulletOrchestratorTest {
         assertTrue(result.finalFeedback.contains("Tapped target 2."))
     }
 
+    @Test
+    fun respondDecisionReturnsFeedbackWithoutExecution() {
+        val executor = FakeExecutor()
+        val orchestrator = ChatTracerBulletOrchestrator(
+            decisionRunner = { _, _ ->
+                AgentDecision(
+                    actionType = ActionType.RESPOND,
+                    targetIndex = 0,
+                    voiceFeedback = "How can I help?",
+                    confidenceScore = 0.95,
+                )
+            },
+            actionExecutor = executor,
+        )
+
+        val result = orchestrator.run(
+            command = "hello",
+            pruningOutcome = PruningOutcome(
+                uiMap = readableUiMap(snapshotId = 50L),
+                nodeRegistry = NodeRegistry().apply { beginSnapshot(50L) },
+                unreadableMessage = null,
+            )
+        )
+
+        assertFalse(result.didExecute)
+        assertEquals("How can I help?", result.finalFeedback)
+        assertEquals(0, executor.calls)
+    }
+
     private fun readableUiMap(snapshotId: Long): PrunedUiMap = PrunedUiMap(
         snapshotId = snapshotId,
         entries = listOf(
