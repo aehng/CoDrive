@@ -1,5 +1,6 @@
 package com.codrive.ai.execution
 
+import android.accessibilityservice.AccessibilityService
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import com.codrive.ai.accessibility.NodeRegistry
@@ -49,5 +50,13 @@ class AccessibilityRuntimeAdapter(
     }
 
     override fun click(bounds: IntArray): Boolean = service?.dispatchMidpointTap(bounds) == true
-}
 
+    override fun goHome(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) == true
+
+    override fun goBack(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
+
+    override fun openRecents(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS) == true
+}

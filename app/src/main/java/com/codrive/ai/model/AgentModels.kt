@@ -16,6 +16,9 @@ enum class ActionType {
     CLICK,
     TYPE,
     SCROLL,
+    HOME,
+    BACK,
+    RECENTS,
     SEARCH_MEMORY,
     RESPOND,
     FINISH,
@@ -76,4 +79,3 @@ data class ExecutionResult(
     val isTerminalFailure: Boolean
         get() = !success
 }
-

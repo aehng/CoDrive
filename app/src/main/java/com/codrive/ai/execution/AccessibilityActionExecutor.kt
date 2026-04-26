@@ -15,6 +15,9 @@ class AccessibilityActionExecutor(
             ActionType.CLICK -> executeClick(decision)
             ActionType.TYPE -> executeType(decision)
             ActionType.SCROLL -> executeScroll(decision)
+            ActionType.HOME -> executeHome()
+            ActionType.BACK -> executeBack()
+            ActionType.RECENTS -> executeRecents()
             ActionType.RESPOND -> ExecutionResult(
                 success = true,
                 message = "Responded without UI action.",
@@ -82,6 +85,33 @@ class AccessibilityActionExecutor(
         )
     }
 
+    private fun executeHome(): ExecutionResult {
+        val success = runtime.goHome()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Navigated to home screen." else "Failed to navigate home.",
+            performedAction = ActionType.HOME
+        )
+    }
+
+    private fun executeBack(): ExecutionResult {
+        val success = runtime.goBack()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Navigated back." else "Failed to navigate back.",
+            performedAction = ActionType.BACK
+        )
+    }
+
+    private fun executeRecents(): ExecutionResult {
+        val success = runtime.openRecents()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Opened recents." else "Failed to open recents.",
+            performedAction = ActionType.RECENTS
+        )
+    }
+
     private fun resolveFreshVisibleNode(targetIndex: Int): UiActionNode? {
         val node = runtime.lookupNode(targetIndex) ?: return null
         if (!node.refresh()) {
@@ -99,4 +129,3 @@ class AccessibilityActionExecutor(
         targetIndex = targetIndex,
     )
 }
-

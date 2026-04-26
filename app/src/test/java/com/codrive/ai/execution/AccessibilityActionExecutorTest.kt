@@ -46,6 +46,9 @@ class AccessibilityActionExecutorTest {
         var node: UiActionNode? = null
         var clickedBounds: IntArray? = null
         var clickResult: Boolean = true
+        var goHomeResult: Boolean = true
+        var goBackResult: Boolean = true
+        var openRecentsResult: Boolean = true
 
         override fun lookupNode(targetIndex: Int): UiActionNode? = node
 
@@ -53,6 +56,12 @@ class AccessibilityActionExecutorTest {
             clickedBounds = bounds
             return clickResult
         }
+
+        override fun goHome(): Boolean = goHomeResult
+
+        override fun goBack(): Boolean = goBackResult
+
+        override fun openRecents(): Boolean = openRecentsResult
     }
 
     @Test
@@ -177,6 +186,21 @@ class AccessibilityActionExecutorTest {
         assertTrue(result.success)
         assertEquals(ActionType.RESPOND, result.performedAction)
         assertEquals(null, runtime.clickedBounds)
+    }
+
+    @Test
+    fun homeUsesGlobalNavigationRuntimePath() {
+        val runtime = FakeRuntime().apply { goHomeResult = true }
+        val executor = AccessibilityActionExecutor(runtime)
+
+        val result = executor.execute(
+            AgentDecision(actionType = ActionType.HOME, confidenceScore = 0.95),
+            PrunedUiMap(1L, emptyList()),
+        )
+
+        assertTrue(result.success)
+        assertEquals(ActionType.HOME, result.performedAction)
+        assertTrue(result.message.contains("home", ignoreCase = true))
     }
 }
 

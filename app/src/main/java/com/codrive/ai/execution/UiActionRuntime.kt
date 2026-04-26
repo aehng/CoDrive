@@ -17,9 +17,11 @@ interface UiActionNode {
 interface UiActionRuntime {
     fun lookupNode(targetIndex: Int): UiActionNode?
     fun click(bounds: IntArray): Boolean
+    fun goHome(): Boolean
+    fun goBack(): Boolean
+    fun openRecents(): Boolean
 }
 
 fun interface RegistryBinder {
     fun bindRegistry(registry: NodeRegistry)
 }
-

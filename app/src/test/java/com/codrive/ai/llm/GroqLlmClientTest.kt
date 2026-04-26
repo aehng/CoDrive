@@ -61,6 +61,8 @@ class GroqLlmClientTest {
         assertEquals("json_object", responseFormat.getString("type"))
         assertTrue(root.optJSONObject("response_format")?.has("json_schema") != true)
         assertTrue(systemPrompt.contains("RESPOND"))
+        assertTrue(systemPrompt.contains("all six"))
+        assertTrue(systemPrompt.contains("target_index=0"))
     }
 
     @Test

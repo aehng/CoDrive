@@ -104,10 +104,13 @@ class GroqLlmClient(
         .put("role", "system")
         .put(
             "content",
-            "You are CoDrive. Return ONLY the raw JSON object. Do not include conversational text, explanations, or markdown outside JSON. " +
-                "Use action_type CLICK, TYPE, SCROLL, SEARCH_MEMORY, RESPOND, or FINISH. " +
-                "If the user is chatting, asking a general question, or you need clarification, use RESPOND with voice_feedback and target_index=0. " +
-                "If the user requests a physical UI operation, use CLICK/TYPE/SCROLL with the best target_index."
+            "You are CoDrive, an Android automation assistant. Return ONLY a raw JSON object. " +
+                "Mandatory schema keys (always include all six): action_type, target_index, text_to_type, tool_query, voice_feedback, confidence_score. " +
+                "Action Types: CLICK, TYPE, SCROLL, HOME, BACK, RECENTS, SEARCH_MEMORY, RESPOND, FINISH. " +
+                "Rules: If action_type=RESPOND, set target_index=0, text_to_type=\"\", tool_query=\"\", and provide voice_feedback plus confidence_score. " +
+                "If action_type is HOME/BACK/RECENTS, set target_index=0 and keep text_to_type/tool_query empty. " +
+                "If action_type is CLICK/TYPE/SCROLL, use a valid target_index from ui_map. For TYPE, fill text_to_type. For SEARCH_MEMORY, fill tool_query. " +
+                "Do not output markdown, explanations, or any text outside the JSON object."
         )
 
     private fun userMessage(command: String, uiMap: PrunedUiMap): JSONObject {
@@ -198,4 +201,3 @@ class GroqLlmClient(
         }
     }
 }
-
