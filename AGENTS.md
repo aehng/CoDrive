@@ -59,7 +59,7 @@ Operational Constraints
 Strict JSON Schema (strict: true)
 
 {
-  "action_type": "CLICK | TYPE | SCROLL | SEARCH_MEMORY | RESPOND | FINISH",
+  "action_type": "CLICK | TYPE | SCROLL | HOME | BACK | RECENTS | OPEN_NOTIFICATIONS | OPEN_QUICK_SETTINGS | OPEN_POWER_DIALOG | LOCK_SCREEN | TAKE_SCREENSHOT | SWIPE_DOWN | SWIPE_UP | SWIPE_LEFT | SWIPE_RIGHT | SEARCH_MEMORY | RESPOND | FINISH",
   "target_index": 0,
   "text_to_type": "string",
   "tool_query": "string",
@@ -175,7 +175,7 @@ Phase 4 — Action execution with anti-stale checks, focus-before-type behavior,
 Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback) plus launcher-ready seams for a persistent overlay bubble.
 
 Immediate next implementation TODOs:
-- [ ] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`.
+- [x] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`. (See `docs/overlay-bubble-entrypoint.md`)
 
 
 Definition of Done (Tracer Bullet MVP):

@@ -19,6 +19,8 @@ class AgentModelsTest {
     @Test
     fun actionTypeEnumerationContainsTracerBulletActions() {
         assertEquals(ActionType.CLICK, ActionType.valueOf("CLICK"))
+        assertEquals(ActionType.OPEN_NOTIFICATIONS, ActionType.valueOf("OPEN_NOTIFICATIONS"))
+        assertEquals(ActionType.SWIPE_DOWN, ActionType.valueOf("SWIPE_DOWN"))
         assertEquals(ActionType.SEARCH_MEMORY, ActionType.valueOf("SEARCH_MEMORY"))
         assertEquals(ActionType.RESPOND, ActionType.valueOf("RESPOND"))
         assertEquals(ActionType.FINISH, ActionType.valueOf("FINISH"))

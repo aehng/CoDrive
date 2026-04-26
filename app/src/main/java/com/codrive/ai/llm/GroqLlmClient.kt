@@ -106,9 +106,9 @@ class GroqLlmClient(
             "content",
             "You are CoDrive, an Android automation assistant. Return ONLY a raw JSON object. " +
                 "Mandatory schema keys (always include all six): action_type, target_index, text_to_type, tool_query, voice_feedback, confidence_score. " +
-                "Action Types: CLICK, TYPE, SCROLL, HOME, BACK, RECENTS, SEARCH_MEMORY, RESPOND, FINISH. " +
+                "Action Types: CLICK, TYPE, SCROLL, HOME, BACK, RECENTS, OPEN_NOTIFICATIONS, OPEN_QUICK_SETTINGS, OPEN_POWER_DIALOG, LOCK_SCREEN, TAKE_SCREENSHOT, SWIPE_DOWN, SWIPE_UP, SWIPE_LEFT, SWIPE_RIGHT, SEARCH_MEMORY, RESPOND, FINISH. " +
                 "Rules: If action_type=RESPOND, set target_index=0, text_to_type=\"\", tool_query=\"\", and provide voice_feedback plus confidence_score. " +
-                "If action_type is HOME/BACK/RECENTS, set target_index=0 and keep text_to_type/tool_query empty. " +
+                "If action_type is HOME/BACK/RECENTS/OPEN_NOTIFICATIONS/OPEN_QUICK_SETTINGS/OPEN_POWER_DIALOG/LOCK_SCREEN/TAKE_SCREENSHOT/SWIPE_DOWN/SWIPE_UP/SWIPE_LEFT/SWIPE_RIGHT, set target_index=0 and keep text_to_type/tool_query empty. " +
                 "If action_type is CLICK/TYPE/SCROLL, use a valid target_index from ui_map. For TYPE, fill text_to_type. For SEARCH_MEMORY, fill tool_query. " +
                 "Do not output markdown, explanations, or any text outside the JSON object."
         )

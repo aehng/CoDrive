@@ -6,6 +6,7 @@
     <string name="open_accessibility_settings">Open Accessibility Settings</string>
     <string name="open_llm_settings_button">Open LLM Settings</string>
     <string name="start_chat_button">Start Chat</string>
+    <string name="start_overlay_button">Start Bubble Overlay</string>
     <string name="chat_send_button">Send</string>
     <string name="chat_hint">Type a command for CoDrive</string>
     <string name="chat_ready_message">Ready. Enter a command to run the tracer bullet.</string>
@@ -39,4 +40,11 @@
     <string name="chat_you_prefix">You:</string>
     <string name="chat_codrive_prefix">CoDrive:</string>
     <string name="chat_action_prefix">Action:</string>
+    <string name="overlay_bubble_content_description">CoDrive bubble overlay</string>
+    <string name="overlay_panel_title">CoDrive Bubble</string>
+    <string name="overlay_open_chat">Open Chat</string>
+    <string name="overlay_close_bubble">Close Bubble</string>
+    <string name="overlay_permission_required">Allow "Display over other apps" for CoDrive to use the bubble overlay.</string>
+    <string name="overlay_running_command">Running command...</string>
+    <string name="overlay_failed_navigation">Failed to perform the requested navigation.</string>
 </resources>

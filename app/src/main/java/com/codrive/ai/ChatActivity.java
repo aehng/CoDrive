@@ -225,37 +225,35 @@ public class ChatActivity extends AppCompatActivity {
 
         String sessionAwareCommand = activeSessionManager.beginTurn(command);
 
+        AccessibilityRuntimeAdapter runtimeAdapter = new AccessibilityRuntimeAdapter(service);
+        AccessibilityActionExecutor actionExecutor = new AccessibilityActionExecutor(runtimeAdapter);
+
         Tier1NavigationRouter tier1NavigationRouter = new Tier1NavigationRouter();
         Tier1NavigationDirective navigationDirective = tier1NavigationRouter.match(command);
         if (navigationDirective != null) {
-            boolean success = service.performGlobalAction(navigationDirective.getGlobalAction());
+            AgentDecision decision = new AgentDecision(
+                    navigationDirective.getActionType(),
+                    0,
+                    "",
+                    "",
+                    navigationDirective.getVoiceFeedback(),
+                    1.0
+            );
+            ExecutionResult executionResult = actionExecutor.execute(decision, new com.codrive.ai.model.PrunedUiMap(0L, java.util.Collections.emptyList()));
+            boolean success = executionResult.getSuccess();
             String message = success ? navigationDirective.getVoiceFeedback() : "Failed to perform the requested navigation.";
             if (success) {
                 activeSessionManager.clear();
             }
             return new TracerBulletResult(
                     message,
-                    new AgentDecision(
-                            ActionType.FINISH,
-                            -1,
-                            "",
-                            "",
-                            message,
-                            success ? 1.0 : 0.0
-                    ),
-                    new ExecutionResult(
-                            success,
-                            message,
-                            ActionType.FINISH,
-                            -1
-                    ),
+                    decision,
+                    executionResult,
                     success
             );
         }
 
         UiTreePruner pruner = new UiTreePruner();
-        AccessibilityRuntimeAdapter runtimeAdapter = new AccessibilityRuntimeAdapter(service);
-        AccessibilityActionExecutor actionExecutor = new AccessibilityActionExecutor(runtimeAdapter);
 
         MemorySearchTool memorySearchTool = new MemorySearchTool(
                 () -> identityDatabase.identityDao(),

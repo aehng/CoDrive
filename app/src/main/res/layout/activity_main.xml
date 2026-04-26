@@ -68,6 +68,14 @@
             android:layout_marginTop="12dp"
             android:text="@string/start_chat_button"
             android:visibility="gone" />
+
+        <Button
+            android:id="@+id/startOverlayButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/start_overlay_button"
+            android:visibility="gone" />
     </LinearLayout>
 
 </LinearLayout>

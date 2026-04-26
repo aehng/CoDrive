@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:importantForAccessibility="noHideDescendants"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <ImageButton
+        android:id="@+id/overlayBubbleButton"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@android:drawable/btn_default"
+        android:contentDescription="@string/overlay_bubble_content_description"
+        android:padding="12dp"
+        android:src="@android:drawable/ic_btn_speak_now" />
+
+    <LinearLayout
+        android:id="@+id/overlayPanel"
+        android:layout_width="280dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@android:color/white"
+        android:elevation="4dp"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/overlayTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_panel_title"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:id="@+id/overlayTranscriptScroll"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:layout_marginTop="8dp"
+            android:background="#F2F2F2"
+            android:fillViewport="true"
+            android:padding="6dp">
+
+            <TextView
+                android:id="@+id/overlayTranscriptText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/chat_ready_message"
+                android:textSize="13sp" />
+        </ScrollView>
+
+        <EditText
+            android:id="@+id/overlayInputText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="@string/chat_hint"
+            android:inputType="text|textMultiLine"
+            android:maxLines="3"
+            android:minLines="1" />
+
+        <Button
+            android:id="@+id/overlaySendButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/chat_send_button" />
+
+        <Button
+            android:id="@+id/overlayOpenChatButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/overlay_open_chat" />
+
+        <Button
+            android:id="@+id/overlayCloseBubbleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/overlay_close_bubble" />
+    </LinearLayout>
+
+</LinearLayout>
+
+

@@ -59,4 +59,37 @@ class AccessibilityRuntimeAdapter(
 
     override fun openRecents(): Boolean =
         service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS) == true
+
+    override fun openNotifications(): Boolean {
+        if (service == null) {
+            return false
+        }
+        return service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) ||
+            service.dispatchDirectionalSwipeDown()
+    }
+
+    override fun openQuickSettings(): Boolean {
+        if (service == null) {
+            return false
+        }
+        return service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS) ||
+            service.dispatchDirectionalSwipeDown()
+    }
+
+    override fun openPowerDialog(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG) == true
+
+    override fun lockScreen(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) == true
+
+    override fun takeScreenshot(): Boolean =
+        service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT) == true
+
+    override fun swipeDown(): Boolean = service?.dispatchDirectionalSwipeDown() == true
+
+    override fun swipeUp(): Boolean = service?.dispatchDirectionalSwipeUp() == true
+
+    override fun swipeLeft(): Boolean = service?.dispatchDirectionalSwipeLeft() == true
+
+    override fun swipeRight(): Boolean = service?.dispatchDirectionalSwipeRight() == true
 }

@@ -1,6 +1,6 @@
 package com.codrive.ai.orchestration
 
-import android.accessibilityservice.AccessibilityService
+import com.codrive.ai.model.ActionType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,7 +12,7 @@ class Tier1NavigationRouterTest {
     fun matchesExplicitHomeCommand() {
         val directive = router.match("please go home")
 
-        assertEquals(AccessibilityService.GLOBAL_ACTION_HOME, directive?.globalAction)
+        assertEquals(ActionType.HOME, directive?.actionType)
         assertEquals("Going home.", directive?.voiceFeedback)
     }
 
@@ -20,7 +20,7 @@ class Tier1NavigationRouterTest {
     fun matchesExplicitBackCommand() {
         val directive = router.match("could you go back")
 
-        assertEquals(AccessibilityService.GLOBAL_ACTION_BACK, directive?.globalAction)
+        assertEquals(ActionType.BACK, directive?.actionType)
         assertEquals("Going back.", directive?.voiceFeedback)
     }
 
@@ -28,8 +28,24 @@ class Tier1NavigationRouterTest {
     fun matchesExplicitRecentsCommand() {
         val directive = router.match("open recents")
 
-        assertEquals(AccessibilityService.GLOBAL_ACTION_RECENTS, directive?.globalAction)
+        assertEquals(ActionType.RECENTS, directive?.actionType)
         assertEquals("Opening recents.", directive?.voiceFeedback)
+    }
+
+    @Test
+    fun matchesNotificationShadeCommand() {
+        val directive = router.match("open notifications")
+
+        assertEquals(ActionType.OPEN_NOTIFICATIONS, directive?.actionType)
+        assertEquals("Opening notifications.", directive?.voiceFeedback)
+    }
+
+    @Test
+    fun matchesSwipeDownCommand() {
+        val directive = router.match("swipe down")
+
+        assertEquals(ActionType.SWIPE_DOWN, directive?.actionType)
+        assertEquals("Swiping down.", directive?.voiceFeedback)
     }
 
     @Test

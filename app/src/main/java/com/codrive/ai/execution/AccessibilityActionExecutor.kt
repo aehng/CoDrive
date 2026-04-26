@@ -18,6 +18,15 @@ class AccessibilityActionExecutor(
             ActionType.HOME -> executeHome()
             ActionType.BACK -> executeBack()
             ActionType.RECENTS -> executeRecents()
+            ActionType.OPEN_NOTIFICATIONS -> executeOpenNotifications()
+            ActionType.OPEN_QUICK_SETTINGS -> executeOpenQuickSettings()
+            ActionType.OPEN_POWER_DIALOG -> executePowerDialog()
+            ActionType.LOCK_SCREEN -> executeLockScreen()
+            ActionType.TAKE_SCREENSHOT -> executeTakeScreenshot()
+            ActionType.SWIPE_DOWN -> executeSwipeDown()
+            ActionType.SWIPE_UP -> executeSwipeUp()
+            ActionType.SWIPE_LEFT -> executeSwipeLeft()
+            ActionType.SWIPE_RIGHT -> executeSwipeRight()
             ActionType.RESPOND -> ExecutionResult(
                 success = true,
                 message = "Responded without UI action.",
@@ -109,6 +118,87 @@ class AccessibilityActionExecutor(
             success = success,
             message = if (success) "Opened recents." else "Failed to open recents.",
             performedAction = ActionType.RECENTS
+        )
+    }
+
+    private fun executeOpenNotifications(): ExecutionResult {
+        val success = runtime.openNotifications()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Opened notifications." else "Failed to open notifications.",
+            performedAction = ActionType.OPEN_NOTIFICATIONS,
+        )
+    }
+
+    private fun executeOpenQuickSettings(): ExecutionResult {
+        val success = runtime.openQuickSettings()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Opened quick settings." else "Failed to open quick settings.",
+            performedAction = ActionType.OPEN_QUICK_SETTINGS,
+        )
+    }
+
+    private fun executePowerDialog(): ExecutionResult {
+        val success = runtime.openPowerDialog()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Opened power dialog." else "Failed to open power dialog.",
+            performedAction = ActionType.OPEN_POWER_DIALOG,
+        )
+    }
+
+    private fun executeLockScreen(): ExecutionResult {
+        val success = runtime.lockScreen()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Locked the screen." else "Failed to lock the screen.",
+            performedAction = ActionType.LOCK_SCREEN,
+        )
+    }
+
+    private fun executeTakeScreenshot(): ExecutionResult {
+        val success = runtime.takeScreenshot()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Captured screenshot." else "Failed to capture screenshot.",
+            performedAction = ActionType.TAKE_SCREENSHOT,
+        )
+    }
+
+    private fun executeSwipeDown(): ExecutionResult {
+        val success = runtime.swipeDown()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Swiped down." else "Failed to swipe down.",
+            performedAction = ActionType.SWIPE_DOWN,
+        )
+    }
+
+    private fun executeSwipeUp(): ExecutionResult {
+        val success = runtime.swipeUp()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Swiped up." else "Failed to swipe up.",
+            performedAction = ActionType.SWIPE_UP,
+        )
+    }
+
+    private fun executeSwipeLeft(): ExecutionResult {
+        val success = runtime.swipeLeft()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Swiped left." else "Failed to swipe left.",
+            performedAction = ActionType.SWIPE_LEFT,
+        )
+    }
+
+    private fun executeSwipeRight(): ExecutionResult {
+        val success = runtime.swipeRight()
+        return ExecutionResult(
+            success = success,
+            message = if (success) "Swiped right." else "Failed to swipe right.",
+            performedAction = ActionType.SWIPE_RIGHT,
         )
     }
 

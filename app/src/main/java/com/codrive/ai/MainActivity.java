@@ -2,6 +2,7 @@ package com.codrive.ai;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -11,12 +12,14 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.PopupMenu;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.codrive.ai.launcher.ChatLauncherEntryPoint;
 import com.codrive.ai.settings.LlmSettingsStore;
 
 public class MainActivity extends AppCompatActivity {
@@ -24,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private Button openSettingsButton;
     private Button openLlmSettingsButton;
     private Button startChatButton;
+    private Button startOverlayButton;
     private LlmSettingsStore llmSettingsStore;
 
     @Override
@@ -44,6 +48,9 @@ public class MainActivity extends AppCompatActivity {
         startChatButton = findViewById(R.id.startChatButton);
         startChatButton.setOnClickListener(v -> openChat());
 
+        startOverlayButton = findViewById(R.id.startOverlayButton);
+        startOverlayButton.setOnClickListener(v -> startOverlayBubble());
+
         ImageButton menuButton = findViewById(R.id.mainMenuButton);
         menuButton.setOnClickListener(this::showNavigationMenu);
 
@@ -60,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         openSettingsButton.setVisibility(serviceEnabled ? View.GONE : View.VISIBLE);
         openLlmSettingsButton.setVisibility(serviceEnabled ? View.VISIBLE : View.GONE);
         startChatButton.setVisibility(serviceEnabled && hasLlmKey ? View.VISIBLE : View.GONE);
+        startOverlayButton.setVisibility(serviceEnabled && hasLlmKey ? View.VISIBLE : View.GONE);
 
         if (!serviceEnabled) {
             statusText.setText(R.string.main_status_disabled);
@@ -76,8 +84,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openChat() {
-        Intent intent = new Intent(this, com.codrive.ai.ChatActivity.class);
-        startActivity(intent);
+        startActivity(ChatLauncherEntryPoint.newChatIntent(this));
+    }
+
+    private void startOverlayBubble() {
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())
+            );
+            startActivity(intent);
+            return;
+        }
+        startService(ChatLauncherEntryPoint.newStartOverlayIntent(this));
     }
 
     private void openLlmSettings() {

@@ -1,9 +1,9 @@
 package com.codrive.ai.orchestration
 
-import android.accessibilityservice.AccessibilityService
+import com.codrive.ai.model.ActionType
 
 data class Tier1NavigationDirective(
-    val globalAction: Int,
+    val actionType: ActionType,
     val voiceFeedback: String,
 )
 
@@ -14,16 +14,40 @@ class Tier1NavigationRouter {
 
         return when (stripped) {
             in HOME_COMMANDS -> Tier1NavigationDirective(
-                globalAction = AccessibilityService.GLOBAL_ACTION_HOME,
+                actionType = ActionType.HOME,
                 voiceFeedback = "Going home.",
             )
             in BACK_COMMANDS -> Tier1NavigationDirective(
-                globalAction = AccessibilityService.GLOBAL_ACTION_BACK,
+                actionType = ActionType.BACK,
                 voiceFeedback = "Going back.",
             )
             in RECENTS_COMMANDS -> Tier1NavigationDirective(
-                globalAction = AccessibilityService.GLOBAL_ACTION_RECENTS,
+                actionType = ActionType.RECENTS,
                 voiceFeedback = "Opening recents.",
+            )
+            in NOTIFICATIONS_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.OPEN_NOTIFICATIONS,
+                voiceFeedback = "Opening notifications.",
+            )
+            in QUICK_SETTINGS_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.OPEN_QUICK_SETTINGS,
+                voiceFeedback = "Opening quick settings.",
+            )
+            in SWIPE_DOWN_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.SWIPE_DOWN,
+                voiceFeedback = "Swiping down.",
+            )
+            in SWIPE_UP_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.SWIPE_UP,
+                voiceFeedback = "Swiping up.",
+            )
+            in SWIPE_LEFT_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.SWIPE_LEFT,
+                voiceFeedback = "Swiping left.",
+            )
+            in SWIPE_RIGHT_COMMANDS -> Tier1NavigationDirective(
+                actionType = ActionType.SWIPE_RIGHT,
+                voiceFeedback = "Swiping right.",
             )
             else -> null
         }
@@ -63,6 +87,36 @@ class Tier1NavigationRouter {
             "app switcher",
             "switch apps",
             "open recent apps",
+        )
+        private val NOTIFICATIONS_COMMANDS = setOf(
+            "open notifications",
+            "show notifications",
+            "notification shade",
+            "open notification shade",
+            "pull down notifications",
+        )
+        private val QUICK_SETTINGS_COMMANDS = setOf(
+            "open quick settings",
+            "show quick settings",
+            "open control center",
+            "show control center",
+        )
+        private val SWIPE_DOWN_COMMANDS = setOf(
+            "swipe down",
+            "scroll down",
+            "pull down",
+        )
+        private val SWIPE_UP_COMMANDS = setOf(
+            "swipe up",
+            "scroll up",
+        )
+        private val SWIPE_LEFT_COMMANDS = setOf(
+            "swipe left",
+            "scroll left",
+        )
+        private val SWIPE_RIGHT_COMMANDS = setOf(
+            "swipe right",
+            "scroll right",
         )
     }
 }

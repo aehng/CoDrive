@@ -20,6 +20,15 @@ interface UiActionRuntime {
     fun goHome(): Boolean
     fun goBack(): Boolean
     fun openRecents(): Boolean
+    fun openNotifications(): Boolean
+    fun openQuickSettings(): Boolean
+    fun openPowerDialog(): Boolean
+    fun lockScreen(): Boolean
+    fun takeScreenshot(): Boolean
+    fun swipeDown(): Boolean
+    fun swipeUp(): Boolean
+    fun swipeLeft(): Boolean
+    fun swipeRight(): Boolean
 }
 
 fun interface RegistryBinder {

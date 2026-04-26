@@ -49,6 +49,15 @@ class AccessibilityActionExecutorTest {
         var goHomeResult: Boolean = true
         var goBackResult: Boolean = true
         var openRecentsResult: Boolean = true
+        var openNotificationsResult: Boolean = true
+        var openQuickSettingsResult: Boolean = true
+        var openPowerDialogResult: Boolean = true
+        var lockScreenResult: Boolean = true
+        var takeScreenshotResult: Boolean = true
+        var swipeDownResult: Boolean = true
+        var swipeUpResult: Boolean = true
+        var swipeLeftResult: Boolean = true
+        var swipeRightResult: Boolean = true
 
         override fun lookupNode(targetIndex: Int): UiActionNode? = node
 
@@ -62,6 +71,24 @@ class AccessibilityActionExecutorTest {
         override fun goBack(): Boolean = goBackResult
 
         override fun openRecents(): Boolean = openRecentsResult
+
+        override fun openNotifications(): Boolean = openNotificationsResult
+
+        override fun openQuickSettings(): Boolean = openQuickSettingsResult
+
+        override fun openPowerDialog(): Boolean = openPowerDialogResult
+
+        override fun lockScreen(): Boolean = lockScreenResult
+
+        override fun takeScreenshot(): Boolean = takeScreenshotResult
+
+        override fun swipeDown(): Boolean = swipeDownResult
+
+        override fun swipeUp(): Boolean = swipeUpResult
+
+        override fun swipeLeft(): Boolean = swipeLeftResult
+
+        override fun swipeRight(): Boolean = swipeRightResult
     }
 
     @Test
@@ -201,6 +228,34 @@ class AccessibilityActionExecutorTest {
         assertTrue(result.success)
         assertEquals(ActionType.HOME, result.performedAction)
         assertTrue(result.message.contains("home", ignoreCase = true))
+    }
+
+    @Test
+    fun openNotificationsUsesDedicatedRuntimePath() {
+        val runtime = FakeRuntime().apply { openNotificationsResult = true }
+        val executor = AccessibilityActionExecutor(runtime)
+
+        val result = executor.execute(
+            AgentDecision(actionType = ActionType.OPEN_NOTIFICATIONS, confidenceScore = 0.95),
+            PrunedUiMap(1L, emptyList()),
+        )
+
+        assertTrue(result.success)
+        assertEquals(ActionType.OPEN_NOTIFICATIONS, result.performedAction)
+    }
+
+    @Test
+    fun swipeDownUsesRuntimeGesturePath() {
+        val runtime = FakeRuntime().apply { swipeDownResult = true }
+        val executor = AccessibilityActionExecutor(runtime)
+
+        val result = executor.execute(
+            AgentDecision(actionType = ActionType.SWIPE_DOWN, confidenceScore = 0.95),
+            PrunedUiMap(1L, emptyList()),
+        )
+
+        assertTrue(result.success)
+        assertEquals(ActionType.SWIPE_DOWN, result.performedAction)
     }
 }
 
