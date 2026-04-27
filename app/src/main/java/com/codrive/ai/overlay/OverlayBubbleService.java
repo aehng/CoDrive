@@ -88,6 +88,22 @@ public class OverlayBubbleService extends Service {
     private ContinuousSpeechRecognizer continuousSpeechRecognizer;
     private UiTreePruner uiTreePruner;
     private IncrementalRequestManager incrementalRequestManager;
+    private final SpeechCommandEndpointer overlayEndpointer = new SpeechCommandEndpointer();
+    private final Runnable autoSubmitRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (inputText == null) return;
+            final String candidate = inputText.getText().toString().trim();
+            if (candidate.isEmpty()) return;
+            SpeechCommandEndpointer.Verdict verdict = overlayEndpointer.evaluateRelaxed(candidate);
+            if (verdict.getShouldSubmit()) {
+                mainHandler.post(() -> submitOverlayCommand(verdict.getCommand(), true));
+            } else {
+                mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_ignored_noise)));
+            }
+        }
+    };
+    private static final long PARTIAL_IDLE_MS = 750L;
 
     @Override
     public void onCreate() {
@@ -121,6 +137,8 @@ public class OverlayBubbleService extends Service {
 
                     @Override
                     public void onCommandReady(String command) {
+                        // Final result ready: cancel any pending auto-submit checks
+                        mainHandler.removeCallbacks(autoSubmitRunnable);
                         mainHandler.post(() -> submitOverlayCommand(command, true));
                     }
 
@@ -129,6 +147,9 @@ public class OverlayBubbleService extends Service {
                         mainHandler.post(() -> {
                             if (inputText != null && partial != null) {
                                 inputText.setText(partial);
+                                // Reset auto-submit timer whenever a partial updates
+                                mainHandler.removeCallbacks(autoSubmitRunnable);
+                                mainHandler.postDelayed(autoSubmitRunnable, PARTIAL_IDLE_MS);
                             }
                         });
                     }
@@ -136,6 +157,8 @@ public class OverlayBubbleService extends Service {
                     @Override
                     public void onCommandRejected(String reason) {
                         mainHandler.post(() -> {
+                            // Cancel auto-submit when explicit rejection occurs
+                            mainHandler.removeCallbacks(autoSubmitRunnable);
                             updateListeningStatus(getString(R.string.overlay_ignored_noise));
                             if (!"empty transcript".equals(reason)) {
                                 appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.overlay_ignored_noise));

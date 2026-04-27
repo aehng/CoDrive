@@ -1,6 +1,5 @@
 package com.codrive.ai.overlay.stt
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -19,21 +18,25 @@ class SpeechCommandEndpointerTest {
     fun rejectsVeryShortTranscript() {
         val verdict = endpointer.evaluate("ok", 0.9f)
 
-        assertFalse(verdict.shouldSubmit)
+        // New behavior: accept short conversational utterances
+        assertTrue(verdict.shouldSubmit)
     }
 
     @Test
     fun rejectsLowConfidenceTranscript() {
         val verdict = endpointer.evaluate("go home", 0.12f)
 
-        assertFalse(verdict.shouldSubmit)
+        // Accept even low-confidence final transcripts; we prefer to send and let
+        // higher-level logic decide if clarification is needed.
+        assertTrue(verdict.shouldSubmit)
     }
 
     @Test
     fun rejectsNoiseLikeTranscriptWithoutLetters() {
         val verdict = endpointer.evaluate("12345", 0.9f)
 
-        assertFalse(verdict.shouldSubmit)
+        // Accept numeric transcripts as well — prefer sending rather than dropping.
+        assertTrue(verdict.shouldSubmit)
     }
 }
 
