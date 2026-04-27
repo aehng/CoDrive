@@ -16,6 +16,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.pow
 import kotlin.random.Random
+import android.util.Log
 
 fun interface GroqTransport {
     @Throws(IOException::class)
@@ -30,6 +31,26 @@ class GroqLlmClient(
     private val sleeper: (Long) -> Unit = { Thread.sleep(it) },
     private val jitterProvider: () -> Long = { Random.nextLong(0, 250) },
 ) : LlmClient {
+
+    private fun logRequestIfEnabled(requestBody: String) {
+        if (BuildConfig.DEBUG) {
+            try {
+                Log.d("CoDrive.Groq", "Groq Request: " + requestBody)
+            } catch (e: Exception) {
+                // ignore logging failures
+            }
+        }
+    }
+
+    private fun logResponseIfEnabled(statusCode: Int, responseBody: String) {
+        if (BuildConfig.DEBUG) {
+            try {
+                Log.d("CoDrive.Groq", "Groq Response (" + statusCode + "): " + responseBody)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
 
     constructor(apiKey: String, model: String) : this(
         apiKey = apiKey,
@@ -46,11 +67,14 @@ class GroqLlmClient(
         var attempt = 0
         while (attempt <= AgentPolicy.groqRetryAttempts) {
             val requestBody = buildRequestBody(command, uiMap)
+            logRequestIfEnabled(requestBody)
             try {
                 val (statusCode, responseBody) = transport.post(
                     requestBody = requestBody,
                     timeoutMillis = AgentPolicy.groqRequestTimeoutMillis.toInt(),
                 )
+
+                logResponseIfEnabled(statusCode, responseBody)
 
                 if (statusCode in 200..299) {
                     return parser.parse(responseBody)
