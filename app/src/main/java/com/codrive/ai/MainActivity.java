@@ -1,5 +1,7 @@
 package com.codrive.ai;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
@@ -14,6 +16,8 @@ import android.widget.TextView;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -23,12 +27,15 @@ import com.codrive.ai.launcher.ChatLauncherEntryPoint;
 import com.codrive.ai.settings.LlmSettingsStore;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_RECORD_AUDIO = 1002;
+
     private TextView statusText;
     private Button openSettingsButton;
     private Button openLlmSettingsButton;
     private Button startChatButton;
     private Button startOverlayButton;
     private LlmSettingsStore llmSettingsStore;
+    private boolean pendingOverlayStart;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,7 +104,35 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
             return;
         }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            pendingOverlayStart = true;
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_RECORD_AUDIO
+            );
+            return;
+        }
+
         startService(ChatLauncherEntryPoint.newStartOverlayIntent(this));
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_RECORD_AUDIO) {
+            return;
+        }
+
+        boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (granted && pendingOverlayStart) {
+            startService(ChatLauncherEntryPoint.newStartOverlayIntent(this));
+        } else {
+            Toast.makeText(this, R.string.main_mic_permission_required, Toast.LENGTH_LONG).show();
+        }
+        pendingOverlayStart = false;
     }
 
     private void openLlmSettings() {

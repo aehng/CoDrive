@@ -1,7 +1,9 @@
 package com.codrive.ai.overlay;
 
+import android.Manifest;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Handler;
@@ -22,11 +24,14 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.room.Room;
 
 import com.codrive.ai.R;
+import com.codrive.ai.accessibility.PruningOutcome;
 import com.codrive.ai.accessibility.UiTreePruner;
 import com.codrive.ai.execution.AccessibilityActionExecutor;
 import com.codrive.ai.execution.AccessibilityRuntimeAdapter;
@@ -40,9 +45,12 @@ import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
+import com.codrive.ai.orchestration.IncrementalRequestManager;
 import com.codrive.ai.orchestration.Tier1NavigationDirective;
 import com.codrive.ai.orchestration.Tier1NavigationRouter;
 import com.codrive.ai.orchestration.TracerBulletResult;
+import com.codrive.ai.overlay.stt.ContinuousSpeechRecognizer;
+import com.codrive.ai.overlay.stt.SpeechCommandEndpointer;
 import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
 
@@ -60,8 +68,11 @@ public class OverlayBubbleService extends Service {
     private LinearLayout panel;
     private ScrollView transcriptScroll;
     private TextView transcriptText;
+    private TextView listeningStatusText;
     private EditText inputText;
     private Button sendButton;
+    private ToggleButton micToggleButton;
+    private Button pushToTalkButton;
 
     private int startX;
     private int startY;
@@ -74,6 +85,9 @@ public class OverlayBubbleService extends Service {
     private IdentityDatabase identityDatabase;
     private LlmSettingsStore llmSettingsStore;
     private ActiveSessionManager activeSessionManager;
+    private ContinuousSpeechRecognizer continuousSpeechRecognizer;
+    private UiTreePruner uiTreePruner;
+    private IncrementalRequestManager incrementalRequestManager;
 
     @Override
     public void onCreate() {
@@ -87,6 +101,68 @@ public class OverlayBubbleService extends Service {
         ).build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager();
+        uiTreePruner = new UiTreePruner();
+        incrementalRequestManager = new IncrementalRequestManager(backgroundExecutor);
+        continuousSpeechRecognizer = new ContinuousSpeechRecognizer(
+                getApplicationContext(),
+                new ContinuousSpeechRecognizer.Callbacks() {
+                    @Override
+                    public void onListeningStateChanged(String message) {
+                        mainHandler.post(() -> updateListeningStatus(message));
+                    }
+
+                    @Override
+                    public void onSpeechDetected() {
+                        // Previously we interrupted the active request as soon as speech was detected.
+                        // That caused frequent "Interrupting current request" messages for brief noises
+                        // or when the user simply started speaking. Instead, only update UI state here.
+                        mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_listening_speech_detected)));
+                    }
+
+                    @Override
+                    public void onCommandReady(String command) {
+                        mainHandler.post(() -> submitOverlayCommand(command, true));
+                    }
+
+                    @Override
+                    public void onPartialTranscript(String partial) {
+                        mainHandler.post(() -> {
+                            if (inputText != null && partial != null) {
+                                inputText.setText(partial);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onCommandRejected(String reason) {
+                        mainHandler.post(() -> {
+                            updateListeningStatus(getString(R.string.overlay_ignored_noise));
+                            if (!"empty transcript".equals(reason)) {
+                                appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.overlay_ignored_noise));
+                                scrollTranscriptToBottom();
+                            }
+                        });
+                    }
+                },
+                new SpeechCommandEndpointer()
+        );
+        incrementalRequestManager.registerCallback(result -> mainHandler.post(() -> {
+            if (sendButton != null) {
+                sendButton.setEnabled(true);
+            }
+            if (inputText != null) {
+                inputText.setText("");
+            }
+            renderResult(result);
+
+            if (!result.getDidExecute()) {
+                Toast.makeText(this, result.getFinalFeedback(), Toast.LENGTH_LONG).show();
+            }
+
+            if (isContinuousListeningEnabled()) {
+                updateListeningStatus(getString(R.string.overlay_listening_starting));
+            }
+        }));
     }
 
     @Override
@@ -118,6 +194,12 @@ public class OverlayBubbleService extends Service {
         if (backgroundExecutor != null) {
             backgroundExecutor.shutdownNow();
         }
+        if (incrementalRequestManager != null) {
+            incrementalRequestManager.endSession();
+        }
+        if (continuousSpeechRecognizer != null) {
+            continuousSpeechRecognizer.stop();
+        }
         if (identityDatabase != null) {
             identityDatabase.close();
         }
@@ -146,14 +228,30 @@ public class OverlayBubbleService extends Service {
         panel = overlayRoot.findViewById(R.id.overlayPanel);
         transcriptScroll = overlayRoot.findViewById(R.id.overlayTranscriptScroll);
         transcriptText = overlayRoot.findViewById(R.id.overlayTranscriptText);
+        listeningStatusText = overlayRoot.findViewById(R.id.overlayListeningStatusText);
         inputText = overlayRoot.findViewById(R.id.overlayInputText);
         sendButton = overlayRoot.findViewById(R.id.overlaySendButton);
+        micToggleButton = overlayRoot.findViewById(R.id.overlayMicToggleButton);
+        pushToTalkButton = overlayRoot.findViewById(R.id.overlayPushToTalkButton);
         Button openChatButton = overlayRoot.findViewById(R.id.overlayOpenChatButton);
         Button closeBubbleButton = overlayRoot.findViewById(R.id.overlayCloseBubbleButton);
 
         bubbleButton.setOnTouchListener(this::onBubbleTouch);
         bubbleButton.setOnClickListener(v -> togglePanel());
-        sendButton.setOnClickListener(v -> submitOverlayCommand());
+        sendButton.setOnClickListener(v -> submitOverlayCommand(inputText.getText().toString().trim(), false));
+        if (micToggleButton != null) {
+            micToggleButton.setChecked(true);
+            micToggleButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) {
+                    startContinuousVoiceMode();
+                } else {
+                    stopContinuousVoiceMode(getString(R.string.overlay_listening_muted));
+                }
+            });
+        }
+        if (pushToTalkButton != null) {
+            pushToTalkButton.setOnTouchListener((view, event) -> handlePushToTalkTouch(event));
+        }
 
         openChatButton.setOnClickListener(v -> {
             startActivity(ChatLauncherEntryPoint.newChatIntent(this));
@@ -163,6 +261,7 @@ public class OverlayBubbleService extends Service {
         closeBubbleButton.setOnClickListener(v -> stopSelf());
 
         windowManager.addView(overlayRoot, layoutParams);
+        startContinuousVoiceMode();
     }
 
     private boolean onBubbleTouch(View view, MotionEvent event) {
@@ -220,12 +319,11 @@ public class OverlayBubbleService extends Service {
         }
     }
 
-    private void submitOverlayCommand() {
-        if (inputText == null || sendButton == null) {
+    private void submitOverlayCommand(String command, boolean fromVoice) {
+        if (sendButton == null) {
             return;
         }
 
-        final String command = inputText.getText().toString().trim();
         if (TextUtils.isEmpty(command)) {
             Toast.makeText(this, R.string.chat_enter_command_first, Toast.LENGTH_SHORT).show();
             return;
@@ -235,29 +333,17 @@ public class OverlayBubbleService extends Service {
         appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.overlay_running_command));
         sendButton.setEnabled(false);
 
-        // Collapse to keep overlay non-focusable before scraping so root selection stays on target app.
-        setPanelExpanded(false);
+        if (fromVoice) {
+            updateListeningStatus(getString(R.string.overlay_running_command));
+        }
 
-        backgroundExecutor.execute(() -> {
-            TracerBulletResult result;
-            try {
-                result = runTracerBullet(command);
-            } catch (Exception error) {
-                Log.e(TAG, "Overlay command failed", error);
-                result = unexpectedFailureResult(error);
-            }
-
-            TracerBulletResult finalResult = result;
-            mainHandler.post(() -> {
-                sendButton.setEnabled(true);
-                inputText.setText("");
-                renderResult(finalResult);
-
-                if (!finalResult.getDidExecute()) {
-                    Toast.makeText(this, finalResult.getFinalFeedback(), Toast.LENGTH_LONG).show();
-                }
-            });
-        });
+        PruningOutcome pruningOutcome = capturePruningOutcome();
+        BiFunction<String, PruningOutcome, TracerBulletResult> runner = this::runTracerBullet;
+        if (fromVoice) {
+            incrementalRequestManager.appendToActiveRequest(command, pruningOutcome, runner);
+        } else {
+            incrementalRequestManager.startSession(command, pruningOutcome, runner);
+        }
     }
 
     private void renderResult(TracerBulletResult result) {
@@ -268,7 +354,7 @@ public class OverlayBubbleService extends Service {
         scrollTranscriptToBottom();
     }
 
-    private TracerBulletResult runTracerBullet(String command) {
+    private TracerBulletResult runTracerBullet(String command, PruningOutcome pruningOutcome) {
         CoDriveAccessibilityService service = CoDriveAccessibilityService.getInstance();
         if (service == null) {
             return new TracerBulletResult(
@@ -310,7 +396,6 @@ public class OverlayBubbleService extends Service {
             return new TracerBulletResult(message, decision, executionResult, success);
         }
 
-        UiTreePruner pruner = new UiTreePruner();
         MemorySearchTool memorySearchTool = new MemorySearchTool(
                 () -> identityDatabase.identityDao(),
                 () -> identityDatabase.sessionContextDao(),
@@ -329,7 +414,7 @@ public class OverlayBubbleService extends Service {
 
         TracerBulletResult result = orchestrator.run(
                 sessionAwareCommand,
-                pruner.prune(service.getLatestAutomationRootNode(), System.currentTimeMillis())
+                pruningOutcome
         );
         activeSessionManager.onDecision(result.getDecision(), result.getDidExecute());
         return result;
@@ -380,6 +465,85 @@ public class OverlayBubbleService extends Service {
         startActivity(intent);
     }
 
+    private void startContinuousVoiceMode() {
+        if (continuousSpeechRecognizer == null) {
+            return;
+        }
+        if (!isContinuousListeningEnabled()) {
+            updateListeningStatus(getString(R.string.overlay_listening_muted));
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            updateListeningStatus(getString(R.string.overlay_listening_no_mic_permission));
+            return;
+        }
+        updateListeningStatus(getString(R.string.overlay_listening_starting));
+        continuousSpeechRecognizer.start();
+    }
+
+    private void stopContinuousVoiceMode(String statusMessage) {
+        if (continuousSpeechRecognizer != null) {
+            continuousSpeechRecognizer.stop();
+        }
+        updateListeningStatus(statusMessage);
+    }
+
+    private void updateListeningStatus(String message) {
+        if (listeningStatusText != null) {
+            listeningStatusText.setText(message);
+        }
+    }
+
+    private void interruptActiveCommand(String optionalStatusMessage) {
+        if (incrementalRequestManager != null) {
+            incrementalRequestManager.cancelActiveRequest();
+        }
+        if (sendButton != null) {
+            sendButton.setEnabled(true);
+        }
+        if (!TextUtils.isEmpty(optionalStatusMessage)) {
+            appendLine(getString(R.string.chat_codrive_prefix), optionalStatusMessage);
+            scrollTranscriptToBottom();
+        }
+    }
+
+    private boolean handlePushToTalkTouch(MotionEvent event) {
+        if (continuousSpeechRecognizer == null) {
+            return false;
+        }
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            updateListeningStatus(getString(R.string.overlay_listening_push_to_talk_active));
+            continuousSpeechRecognizer.start();
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            // Always stop the recognizer on release so we get final results and submit the command.
+            continuousSpeechRecognizer.stop();
+            updateListeningStatus(getString(R.string.overlay_listening_push_to_talk_idle));
+
+            // If continuous listening is enabled, resume it shortly after releasing the PTT button.
+            if (isContinuousListeningEnabled()) {
+                mainHandler.postDelayed(() -> startContinuousVoiceMode(), 150L);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isContinuousListeningEnabled() {
+        return micToggleButton == null || micToggleButton.isChecked();
+    }
+
+    private PruningOutcome capturePruningOutcome() {
+        CoDriveAccessibilityService service = CoDriveAccessibilityService.getInstance();
+        return uiTreePruner.prune(
+                service != null ? service.getLatestAutomationRootNode() : null,
+                System.currentTimeMillis()
+        );
+    }
+
     private void detachOverlay() {
         if (overlayRoot != null && windowManager != null) {
             windowManager.removeView(overlayRoot);
@@ -387,8 +551,11 @@ public class OverlayBubbleService extends Service {
             panel = null;
             transcriptScroll = null;
             transcriptText = null;
+            listeningStatusText = null;
             inputText = null;
             sendButton = null;
+            micToggleButton = null;
+            pushToTalkButton = null;
             layoutParams = null;
         }
     }

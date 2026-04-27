@@ -25,6 +25,8 @@ All launcher surfaces should use this contract instead of constructing ad-hoc in
 - Tap bubble toggles a mini panel.
 - Inline panel includes transcript + command box + send button.
 - Commands execute directly from the bubble (no `ChatActivity` handoff required).
+- Draft always-listening STT runs inside the overlay service with pause-based auto-submit.
+- If new speech starts while a request is in flight, the service performs a best-effort cancel and suppresses stale UI results.
 - Panel actions:
   - `Open Chat`: launches `ChatActivity` via `ChatLauncherEntryPoint`.
   - `Close Bubble`: stops the overlay service.

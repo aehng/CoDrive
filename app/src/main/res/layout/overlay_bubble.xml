@@ -33,6 +33,38 @@
             android:text="@string/overlay_panel_title"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/overlayListeningStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/overlay_listening_starting"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <ToggleButton
+                android:id="@+id/overlayMicToggleButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:textOff="@string/overlay_mic_off"
+                android:textOn="@string/overlay_mic_on" />
+
+            <Button
+                android:id="@+id/overlayPushToTalkButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:text="@string/overlay_push_to_talk" />
+        </LinearLayout>
+
         <ScrollView
             android:id="@+id/overlayTranscriptScroll"
             android:layout_width="match_parent"

@@ -21,6 +21,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.room.Room;
 
 import com.codrive.ai.R;
+import com.codrive.ai.accessibility.PruningOutcome;
+import com.codrive.ai.accessibility.UiTreePruner;
 import com.codrive.ai.execution.AccessibilityActionExecutor;
 import com.codrive.ai.execution.AccessibilityRuntimeAdapter;
 import com.codrive.ai.llm.LlmClientFactory;
@@ -32,12 +34,12 @@ import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
+import com.codrive.ai.orchestration.IncrementalRequestManager;
 import com.codrive.ai.orchestration.Tier1NavigationDirective;
 import com.codrive.ai.orchestration.Tier1NavigationRouter;
 import com.codrive.ai.orchestration.TracerBulletResult;
 import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
-import com.codrive.ai.accessibility.UiTreePruner;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +55,8 @@ public class ChatActivity extends AppCompatActivity {
     private ExecutorService backgroundExecutor;
     private LlmSettingsStore llmSettingsStore;
     private ActiveSessionManager activeSessionManager;
+    private IncrementalRequestManager incrementalRequestManager;
+    private UiTreePruner uiTreePruner;
 
     private static final String TAG = "ChatActivity";
 
@@ -82,6 +86,19 @@ public class ChatActivity extends AppCompatActivity {
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager();
         backgroundExecutor = Executors.newSingleThreadExecutor();
+        incrementalRequestManager = new IncrementalRequestManager(backgroundExecutor);
+        uiTreePruner = new UiTreePruner();
+
+        incrementalRequestManager.registerCallback(result -> runOnUiThread(() -> {
+            sendButton.setEnabled(true);
+            inputText.setText("");
+            renderResult(result);
+
+            String feedback = result.getFinalFeedback();
+            if (!result.getDidExecute()) {
+                Toast.makeText(this, feedback, Toast.LENGTH_LONG).show();
+            }
+        }));
 
         sendButton.setOnClickListener(v -> submitCommand());
     }
@@ -90,6 +107,9 @@ public class ChatActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (backgroundExecutor != null) {
             backgroundExecutor.shutdownNow();
+        }
+        if (incrementalRequestManager != null) {
+            incrementalRequestManager.endSession();
         }
         if (identityDatabase != null) {
             identityDatabase.close();
@@ -106,27 +126,11 @@ public class ChatActivity extends AppCompatActivity {
 
         appendLine(getString(R.string.chat_you_prefix), command);
         sendButton.setEnabled(false);
-
-        backgroundExecutor.execute(() -> {
-            TracerBulletResult result;
-            try {
-                result = runTracerBullet(command);
-            } catch (Exception error) {
-                Log.e(TAG, "Tracer bullet failed", error);
-                result = unexpectedFailureResult(error);
-            }
-            final TracerBulletResult finalResult = result;
-            runOnUiThread(() -> {
-                sendButton.setEnabled(true);
-                inputText.setText("");
-                renderResult(finalResult);
-
-                String feedback = finalResult.getFinalFeedback();
-                if (!finalResult.getDidExecute()) {
-                    Toast.makeText(this, feedback, Toast.LENGTH_LONG).show();
-                }
-            });
-        });
+        incrementalRequestManager.startSession(
+                command,
+                capturePruningOutcome(),
+                this::runTracerBullet
+        );
     }
 
     private void renderResult(TracerBulletResult result) {
@@ -212,7 +216,7 @@ public class ChatActivity extends AppCompatActivity {
         );
     }
 
-    private TracerBulletResult runTracerBullet(String command) {
+    private TracerBulletResult runTracerBullet(String command, PruningOutcome pruningOutcome) {
         CoDriveAccessibilityService service = CoDriveAccessibilityService.getInstance();
         if (service == null) {
             return new TracerBulletResult(
@@ -253,8 +257,6 @@ public class ChatActivity extends AppCompatActivity {
             );
         }
 
-        UiTreePruner pruner = new UiTreePruner();
-
         MemorySearchTool memorySearchTool = new MemorySearchTool(
                 () -> identityDatabase.identityDao(),
                 () -> identityDatabase.sessionContextDao(),
@@ -274,9 +276,17 @@ public class ChatActivity extends AppCompatActivity {
 
         TracerBulletResult result = orchestrator.run(
                 sessionAwareCommand,
-                pruner.prune(service.getLatestRootNode(), System.currentTimeMillis())
+                pruningOutcome
         );
         activeSessionManager.onDecision(result.getDecision(), result.getDidExecute());
         return result;
+    }
+
+    private PruningOutcome capturePruningOutcome() {
+        CoDriveAccessibilityService service = CoDriveAccessibilityService.getInstance();
+        return uiTreePruner.prune(
+                service != null ? service.getLatestRootNode() : null,
+                System.currentTimeMillis()
+        );
     }
 }

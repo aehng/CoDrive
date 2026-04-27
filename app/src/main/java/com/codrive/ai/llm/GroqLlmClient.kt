@@ -110,6 +110,7 @@ class GroqLlmClient(
                 "Rules: If action_type=RESPOND, set target_index=0, text_to_type=\"\", tool_query=\"\", and provide voice_feedback plus confidence_score. " +
                 "If action_type is HOME/BACK/RECENTS/OPEN_NOTIFICATIONS/OPEN_QUICK_SETTINGS/OPEN_POWER_DIALOG/LOCK_SCREEN/TAKE_SCREENSHOT/SWIPE_DOWN/SWIPE_UP/SWIPE_LEFT/SWIPE_RIGHT, set target_index=0 and keep text_to_type/tool_query empty. " +
                 "If action_type is CLICK/TYPE/SCROLL, use a valid target_index from ui_map. For TYPE, fill text_to_type. For SEARCH_MEMORY, fill tool_query. " +
+                "If the user continues speaking, merge continuation text with previous user content and decide from the combined intent. " +
                 "Do not output markdown, explanations, or any text outside the JSON object."
         )
 

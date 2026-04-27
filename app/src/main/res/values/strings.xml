@@ -47,4 +47,16 @@
     <string name="overlay_permission_required">Allow "Display over other apps" for CoDrive to use the bubble overlay.</string>
     <string name="overlay_running_command">Running command...</string>
     <string name="overlay_failed_navigation">Failed to perform the requested navigation.</string>
+    <string name="overlay_listening_starting">Voice mode starting...</string>
+    <string name="overlay_listening_no_mic_permission">Mic permission is required for always-listening voice mode.</string>
+    <string name="overlay_interrupting_request">New speech detected. Interrupting current request.</string>
+    <string name="overlay_ignored_noise">Ignored non-command speech.</string>
+    <string name="overlay_listening_speech_detected">Speech detected...</string>
+    <string name="overlay_mic_on">Mic On</string>
+    <string name="overlay_mic_off">Mic Off</string>
+    <string name="overlay_push_to_talk">Hold to Talk</string>
+    <string name="overlay_listening_muted">Mic muted. Hold to Talk to issue a command.</string>
+    <string name="overlay_listening_push_to_talk_active">Listening (push-to-talk)...</string>
+    <string name="overlay_listening_push_to_talk_idle">Mic muted. Release complete.</string>
+    <string name="main_mic_permission_required">Allow microphone access so CoDrive can listen continuously.</string>
 </resources>

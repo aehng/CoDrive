@@ -37,4 +37,5 @@ CoDrive is an Android 13+ accessibility proxy for overlay chat and future voice-
 - Gesture coverage now includes global actions + directional swipes (including notification shade style actions)
 - Bubble overlay now supports inline transcript + send box (commands can run without opening `ChatActivity`)
 - Accessibility scrape root prefers non-CoDrive windows so overlay/chat UI is excluded from automation context
+- Overlay now includes draft always-listening STT with pause-based auto-submit and best-effort interruption of in-flight requests
 
