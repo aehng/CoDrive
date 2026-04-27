@@ -39,16 +39,24 @@ class UiTreePruner(
                 node.childAt(childIndex)?.let(immediateChildren::add)
             }
 
+            val consumedChildren = mutableSetOf<UiNodeSnapshot>()
+
             val shouldKeep = shouldKeep(node)
             if (shouldKeep) {
                 val entryIndex = crawlIndex++
-                val mergedText = mergedClickableLabel(node, immediateChildren)
+                val mergedText = mergedClickableLabel(node, immediateChildren, consumedChildren)
+
+                // If description equals text, drop the description to save tokens
+                val nodeText = mergedText ?: node.text?.toString()
+                val nodeDesc = node.contentDescription?.toString()
+                val contentDescription = if (!nodeText.isNullOrEmpty() && nodeText == nodeDesc) null else nodeDesc
+
                 val entry = PrunedNodeEntry(
                     index = entryIndex,
                     role = roleFor(node),
                     bounds = node.bounds.copyOf(),
-                    text = mergedText ?: node.text?.toString(),
-                    contentDescription = node.contentDescription?.toString(),
+                    text = nodeText,
+                    contentDescription = contentDescription,
                     isInteractive = isInteractive(node),
                 )
                 entries += entry
@@ -56,6 +64,11 @@ class UiTreePruner(
             }
 
             for (child in immediateChildren) {
+                if (consumedChildren.contains(child)) {
+                    // we consumed this child's text for the parent; recycle and skip
+                    child.recycle()
+                    continue
+                }
                 dfs(child, recycleSelf = true)
             }
 
@@ -95,7 +108,11 @@ class UiTreePruner(
         else -> UiRole.TEXT
     }
 
-    private fun mergedClickableLabel(node: UiNodeSnapshot, immediateChildren: List<UiNodeSnapshot>): String? {
+    private fun mergedClickableLabel(
+        node: UiNodeSnapshot,
+        immediateChildren: List<UiNodeSnapshot>,
+        consumedChildren: MutableSet<UiNodeSnapshot>
+    ): String? {
         if (!node.isClickable) {
             return null
         }
@@ -108,8 +125,22 @@ class UiTreePruner(
             if (!child.isVisibleToUser || isInteractive(child)) {
                 continue
             }
-            child.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
-            child.contentDescription?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(parts::add)
+            val childText = child.text?.toString()?.trim()
+            val childDesc = child.contentDescription?.toString()?.trim()
+
+            if (!childText.isNullOrEmpty() && parts.isEmpty()) {
+                parts.add(childText)
+                consumedChildren.add(child)
+            } else if (!childText.isNullOrEmpty()) {
+                parts.add(childText)
+            }
+
+            if (!childDesc.isNullOrEmpty() && parts.isEmpty()) {
+                parts.add(childDesc)
+                consumedChildren.add(child)
+            } else if (!childDesc.isNullOrEmpty()) {
+                parts.add(childDesc)
+            }
         }
 
         return parts.distinct().joinToString(" ").trim().takeIf { it.isNotEmpty() }

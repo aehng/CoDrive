@@ -7,6 +7,7 @@ import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.AgentPolicy
 import com.codrive.ai.model.PrunedNodeEntry
 import com.codrive.ai.model.PrunedUiMap
+import com.codrive.ai.model.UiRole
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -128,14 +129,30 @@ class GroqLlmClient(
         .put("role", "system")
         .put(
             "content",
-            "You are CoDrive, an Android automation assistant. Return ONLY a raw JSON object. " +
-                "Mandatory schema keys (always include all six): action_type, target_index, text_to_type, tool_query, voice_feedback, confidence_score. " +
-                "Action Types: CLICK, TYPE, SCROLL, HOME, BACK, RECENTS, OPEN_NOTIFICATIONS, OPEN_QUICK_SETTINGS, OPEN_POWER_DIALOG, LOCK_SCREEN, TAKE_SCREENSHOT, SWIPE_DOWN, SWIPE_UP, SWIPE_LEFT, SWIPE_RIGHT, SEARCH_MEMORY, RESPOND, FINISH. " +
-                "Rules: If action_type=RESPOND, set target_index=0, text_to_type=\"\", tool_query=\"\", and provide voice_feedback plus confidence_score. " +
-                "If action_type is HOME/BACK/RECENTS/OPEN_NOTIFICATIONS/OPEN_QUICK_SETTINGS/OPEN_POWER_DIALOG/LOCK_SCREEN/TAKE_SCREENSHOT/SWIPE_DOWN/SWIPE_UP/SWIPE_LEFT/SWIPE_RIGHT, set target_index=0 and keep text_to_type/tool_query empty. " +
-                "If action_type is CLICK/TYPE/SCROLL, use a valid target_index from ui_map. For TYPE, fill text_to_type. For SEARCH_MEMORY, fill tool_query. " +
-                "If the user continues speaking, merge continuation text with previous user content and decide from the combined intent. " +
-                "Do not output markdown, explanations, or any text outside the JSON object."
+            """
+            You are CoDrive, an Android automation assistant. CRITICAL RULE: Return ONLY the raw JSON object and nothing else. Do NOT output markdown, explanations, chain-of-thought, or any text outside the JSON object.
+
+            Mandatory Schema (must be valid JSON exactly):
+            {
+              "action_type": "CLICK|TYPE|SCROLL|HOME|BACK|RECENTS|SEARCH_MEMORY|RESPOND|FINISH",
+              "target_index": 0,
+              "text_to_type": "",
+              "tool_query": "",
+              "voice_feedback": "",
+              "confidence_score": 0.0
+            }
+
+            Rules:
+            - If action_type is RESPOND or a system navigation (HOME/BACK), target_index must be 0.
+            - If action_type is CLICK/TYPE/SCROLL, use a valid index from ui_map for target_index. For TYPE, supply text_to_type. For SEARCH_MEMORY, supply tool_query.
+
+            UI MAP LEGEND:
+            Each entry in ui_map is a 4-item tuple: [index:int, role:char, [center_x:int, center_y:int], text:string]
+            - role: 't' = text, 'b' = button, 'i' = input, 'c' = checkbox
+            - text MUST be present; use an empty string when no visible text exists.
+
+            Example ui_map entry: [4, "b", [915, 573], "Gallery"]
+            """.trimIndent()
         )
 
     private fun userMessage(command: String, uiMap: PrunedUiMap): JSONObject {
@@ -161,14 +178,30 @@ class GroqLlmClient(
 
     private fun List<PrunedNodeEntry>.toBudgetedUiJson(): JSONArray = JSONArray().apply {
         for (entry in this@toBudgetedUiJson.take(MAX_UI_ENTRIES)) {
-            put(JSONObject()
-                .put("index", entry.index)
-                .put("role", entry.role.name.lowercase())
-                .put("bounds", JSONArray(entry.boundsAsList()))
-                .put("text", (entry.text ?: "").take(MAX_TEXT_LENGTH))
-                .put("content_description", (entry.contentDescription ?: "").take(MAX_TEXT_LENGTH))
-                .put("interactive", entry.isInteractive)
-            )
+            // Role char mapping: TEXT='t', BUTTON='b', INPUT='i', CHECKBOX='c'
+            val roleChar = when (entry.role) {
+                UiRole.TEXT -> "t"
+                UiRole.BUTTON -> "b"
+                UiRole.INPUT -> "i"
+                UiRole.CHECKBOX -> "c"
+            }
+
+            // Compute center coordinates
+            val bounds = entry.boundsAsList()
+            val centerX = (bounds[0] + bounds[2]) / 2
+            val centerY = (bounds[1] + bounds[3]) / 2
+
+            // Ensure text field is always present (empty string if absent)
+            val finalText = (entry.text ?: entry.contentDescription ?: "").take(MAX_TEXT_LENGTH)
+
+            val tuple = JSONArray().apply {
+                put(entry.index)
+                put(roleChar)
+                put(JSONArray().apply { put(centerX); put(centerY) })
+                put(finalText)
+            }
+
+            put(tuple)
         }
     }
 

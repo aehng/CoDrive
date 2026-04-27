@@ -15,14 +15,64 @@ class InferenceLoopRunner @JvmOverloads constructor(
         var prompt = initialCommand
 
         repeat(maxTurns) {
-            val decision = llmClient.infer(prompt, uiMap)
-            if (decision.actionType != ActionType.SEARCH_MEMORY) {
-                return decision
+            // Wrap the LLM call in a small retry loop to avoid immediate crash on transient rate limits
+            var attempt = 0
+            var resolved: AgentDecision? = null
+            try {
+                while (true) {
+                    try {
+                        resolved = llmClient.infer(prompt, uiMap)
+                        break
+                    } catch (e: Exception) {
+                        attempt += 1
+                        if (attempt > 3) throw e
+                        try {
+                            Thread.sleep(6500L)
+                        } catch (_: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                return AgentDecision(
+                    actionType = ActionType.FINISH,
+                    targetIndex = -1,
+                    textToType = "",
+                    toolQuery = "",
+                    voiceFeedback = "I'm having trouble connecting right now.",
+                    confidenceScore = 0.0,
+                )
             }
 
-            val memoryResult = memorySearchTool.search(decision.toolQuery)
+            val resolvedNonNull = resolved ?: return AgentDecision(
+                actionType = ActionType.FINISH,
+                targetIndex = -1,
+                textToType = "",
+                toolQuery = "",
+                voiceFeedback = "I'm having trouble connecting right now.",
+                confidenceScore = 0.0,
+            )
+
+            if (resolvedNonNull.actionType != ActionType.SEARCH_MEMORY) {
+                return resolvedNonNull
+            }
+
+            val memoryResult = try {
+                memorySearchTool.search(resolvedNonNull.toolQuery)
+            } catch (e: Exception) {
+                return AgentDecision(
+                    actionType = ActionType.FINISH,
+                    targetIndex = -1,
+                    textToType = "",
+                    toolQuery = "",
+                    voiceFeedback = "I'm having trouble searching memory right now.",
+                    confidenceScore = 0.0,
+                )
+            }
+
+            // Preserve the full prompt/context across memory-search iterations
             prompt = buildString {
-                append(initialCommand)
+                append(prompt)
                 append("\nMEMORY_RESULT: ")
                 append(memoryResult)
             }
