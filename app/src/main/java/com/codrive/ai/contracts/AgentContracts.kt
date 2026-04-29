@@ -16,6 +16,8 @@ interface TtsEngine {
 
 interface LlmClient {
     fun infer(command: String, uiMap: PrunedUiMap): AgentDecision
+    /** Optional cancellation hook. Implementations that support cancellable in-flight requests should override. */
+    fun cancel() { }
 }
 
 interface ActionExecutor {

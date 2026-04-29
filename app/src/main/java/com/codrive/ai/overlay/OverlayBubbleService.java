@@ -424,21 +424,49 @@ public class OverlayBubbleService extends Service {
                 () -> identityDatabase.sessionContextDao(),
                 System::currentTimeMillis
         );
+        // Create LLM client and orchestrator. We attach a watchdog that will call
+        // `llmClient.cancel()` if the worker thread is interrupted so in-flight
+        // OkHttp calls (or other cancellable transports) are aborted promptly.
+        final com.codrive.ai.contracts.LlmClient llmClientRef = LlmClientFactory.create(llmSettingsStore);
         InferenceLoopRunner loopRunner = new InferenceLoopRunner(
-                LlmClientFactory.create(llmSettingsStore),
+                llmClientRef,
                 memorySearchTool
         );
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;
-        ChatTracerBulletOrchestrator orchestrator = new ChatTracerBulletOrchestrator(
+        ChatTracerBulletOrchestrator orchestratorLocal = new ChatTracerBulletOrchestrator(
                 decisionRunner,
                 actionExecutor,
                 runtimeAdapter::bindRegistry
         );
 
-        TracerBulletResult result = orchestrator.run(
-                sessionAwareCommand,
-                pruningOutcome
-        );
+        TracerBulletResult result;
+        final Thread workerThread = Thread.currentThread();
+        Thread watchdog = new Thread(() -> {
+            try {
+                while (!workerThread.isInterrupted()) {
+                    Thread.sleep(50);
+                }
+                try {
+                    llmClientRef.cancel();
+                } catch (Exception ex) {
+                    // ignore
+                }
+            } catch (InterruptedException ie) {
+                // exit
+            }
+        });
+        watchdog.setDaemon(true);
+        watchdog.start();
+
+        try {
+            result = orchestratorLocal.run(
+                    sessionAwareCommand,
+                    pruningOutcome
+            );
+        } finally {
+            watchdog.interrupt();
+        }
+
         activeSessionManager.onDecision(result.getDecision(), result.getDidExecute());
         return result;
     }

@@ -21,8 +21,14 @@ class LlmProviderTest {
     @Test
     fun tracerBulletSupportIsGroqOnlyForNow() {
         assertTrue(LlmProvider.GROQ.isTracerBulletSupported())
-        assertFalse(LlmProvider.GEMINI.isTracerBulletSupported())
+        // Gemini is now wired in the tracer-bullet path (skeleton transport). OpenAI remains unsupported.
+        assertTrue(LlmProvider.GEMINI.isTracerBulletSupported())
         assertFalse(LlmProvider.OPENAI.isTracerBulletSupported())
+    }
+
+    @Test
+    fun geminiDisplayNameIsModelLabel() {
+        assertEquals("Gemini", LlmProvider.GEMINI.displayName())
     }
 }
 

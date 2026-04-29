@@ -24,7 +24,9 @@ class LlmKeyValidator(
             return KeyValidationResult(false, "API key is required.")
         }
 
-        if (provider != LlmProvider.GROQ) {
+        // Support validation for wired providers (GROQ and GEMINI). Other providers are not wired yet.
+        val wiredProviders = setOf(LlmProvider.GROQ, LlmProvider.GEMINI)
+        if (provider !in wiredProviders) {
             return KeyValidationResult(
                 false,
                 "${provider.displayName()} is saved but not wired for tracer bullet yet.",
@@ -36,12 +38,27 @@ class LlmKeyValidator(
         }
 
         return try {
-            val (statusCode, _) = transport.get(GROQ_MODELS_URL, apiKey, VALIDATION_TIMEOUT_MS)
-            when {
-                statusCode in 200..299 -> KeyValidationResult(true, "Key validated. Returning to chat launcher.")
-                statusCode == 401 || statusCode == 403 -> KeyValidationResult(false, "Invalid Groq API key.")
-                statusCode == 429 -> KeyValidationResult(true, "Key accepted (rate-limited right now).")
-                else -> KeyValidationResult(false, "Validation failed (${statusCode}).")
+            when (provider) {
+                LlmProvider.GROQ -> {
+                    val (statusCode, _) = transport.get(GROQ_MODELS_URL, apiKey, VALIDATION_TIMEOUT_MS)
+                    when {
+                        statusCode in 200..299 -> KeyValidationResult(true, "Key validated. Returning to chat launcher.")
+                        statusCode == 401 || statusCode == 403 -> KeyValidationResult(false, "Invalid Groq API key.")
+                        statusCode == 429 -> KeyValidationResult(true, "Key accepted (rate-limited right now).")
+                        else -> KeyValidationResult(false, "Validation failed (${statusCode}).")
+                    }
+                }
+                LlmProvider.GEMINI -> {
+                    // Use the injected transport for a lightweight validation ping to Gemini's predict endpoint.
+                    val (statusCode, _) = transport.get(GEMINI_PREDICT_URL, apiKey, VALIDATION_TIMEOUT_MS)
+                    when {
+                        statusCode in 200..299 -> KeyValidationResult(true, "Key validated. Returning to chat launcher.")
+                        statusCode == 401 || statusCode == 403 -> KeyValidationResult(false, "Invalid Gemini API key.")
+                        statusCode == 429 -> KeyValidationResult(true, "Key accepted (rate-limited right now).")
+                        else -> KeyValidationResult(false, "Validation failed (${statusCode}).")
+                    }
+                }
+                else -> KeyValidationResult(false, "Provider not supported for validation.")
             }
         } catch (_: IOException) {
             KeyValidationResult(false, "Validation failed. Check network and try again.")
@@ -50,6 +67,7 @@ class LlmKeyValidator(
 
     companion object {
         private const val GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
+        private const val GEMINI_PREDICT_URL = "https://generativelanguage.googleapis.com/v1/models:predict"
         private const val VALIDATION_TIMEOUT_MS = 6_000
 
         private fun defaultTransport(): KeyValidationTransport = KeyValidationTransport { url, apiKey, timeoutMillis ->

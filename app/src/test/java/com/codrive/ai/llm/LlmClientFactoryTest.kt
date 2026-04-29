@@ -22,12 +22,13 @@ class LlmClientFactoryTest {
 
     @Test
     fun createForUnsupportedProviderReturnsSafeClient() {
-        val client = LlmClientFactory.createFor(LlmProvider.GEMINI, "gemini-2.5-flash", "key")
+        // When GEMINI is selected but no key is provided the factory should return a safe client
+        val client = LlmClientFactory.createFor(LlmProvider.GEMINI, "gemini-2.5-flash", "")
 
         val decision = client.infer("tap", sampleUiMap())
 
         assertEquals(ActionType.FINISH, decision.actionType)
-        assertTrue(decision.voiceFeedback.contains("only Groq", ignoreCase = true))
+        assertTrue(decision.voiceFeedback.contains("not configured", ignoreCase = true))
     }
 
     @Test

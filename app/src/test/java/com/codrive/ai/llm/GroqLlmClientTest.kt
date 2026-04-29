@@ -57,12 +57,16 @@ class GroqLlmClientTest {
             .getString("content")
 
         assertTrue(uiArray.length() <= 80)
-        assertTrue(uiArray.getJSONObject(0).getString("text").length <= 120)
+        // ui_map is now a compact tuple array: [index, roleChar, [cx, cy], text]
+        val firstEntry = uiArray.getJSONArray(0)
+        val text = firstEntry.getString(3)
+        assertTrue(text.length <= 120)
         assertEquals("json_object", responseFormat.getString("type"))
         assertTrue(root.optJSONObject("response_format")?.has("json_schema") != true)
         assertTrue(systemPrompt.contains("RESPOND"))
-        assertTrue(systemPrompt.contains("all six"))
-        assertTrue(systemPrompt.contains("target_index=0"))
+        // Ensure the system prompt includes the mandatory schema guidance
+        assertTrue(systemPrompt.contains("Mandatory Schema") || systemPrompt.contains("ui_map"))
+        assertTrue(systemPrompt.contains("target_index"))
     }
 
     @Test

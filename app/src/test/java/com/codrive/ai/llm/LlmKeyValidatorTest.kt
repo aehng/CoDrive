@@ -36,13 +36,12 @@ class LlmKeyValidatorTest {
     }
 
     @Test
-    fun validateRejectsNonGroqForTracerBullet() {
+    fun validateAcceptsGeminiWhenWired() {
         val validator = LlmKeyValidator { _, _, _ -> 200 to "{}" }
 
         val result = validator.validate(LlmProvider.GEMINI, "gemini-2.5-flash", "key")
 
-        assertFalse(result.isValid)
-        assertTrue(result.message.contains("not wired", ignoreCase = true))
+        assertTrue(result.isValid)
     }
 }
 

@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -28,6 +29,7 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView keyPreview;
     private TextView statusText;
     private LlmSettingsStore settingsStore;
+    private static final String DEFAULT_GEMINI_MODEL = "gemma-3-27b-instruct";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,14 +67,33 @@ public class SettingsActivity extends AppCompatActivity {
 
         loadCurrentSettings();
 
+        // When the user switches the provider in the UI, load the provider-specific model/key.
+        providerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                LlmProvider selected = LlmProvider.values()[position];
+                updateForProvider(selected);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
+
         saveButton.setOnClickListener(v -> saveSettings());
     }
 
     private void loadCurrentSettings() {
         LlmProvider provider = settingsStore.getProvider();
         providerSpinner.setSelection(provider.ordinal());
-        modelInput.setText(settingsStore.getModel());
-        keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKey()));
+        String storedModel = settingsStore.getModelFor(provider);
+        if (provider == LlmProvider.GEMINI && (storedModel == null || storedModel.trim().isEmpty())) {
+            modelInput.setText(DEFAULT_GEMINI_MODEL);
+        } else {
+            modelInput.setText(storedModel);
+        }
+        keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
         statusText.setText(R.string.settings_status_idle);
     }
 
@@ -83,10 +104,10 @@ public class SettingsActivity extends AppCompatActivity {
 
         settingsStore.saveProviderAndModel(provider, model);
         if (!TextUtils.isEmpty(enteredKey)) {
-            settingsStore.saveApiKey(enteredKey);
+            settingsStore.saveApiKeyFor(provider, enteredKey);
         }
 
-        keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKey()));
+        keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
         apiKeyInput.setText("");
 
         if (!provider.isTracerBulletSupported()) {
@@ -94,7 +115,43 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
 
-        statusText.setText(R.string.settings_saved);
+        // For tracer-bullet providers (Groq, Gemini) run a lightweight validation when a key was entered.
+        if (provider == LlmProvider.GEMINI && !TextUtils.isEmpty(settingsStore.getApiKeyFor(provider))) {
+            statusText.setText(R.string.settings_status_validating);
+            final String keyToValidate = settingsStore.getApiKeyFor(provider);
+            final String modelToValidate = settingsStore.getModelFor(provider);
+            new Thread(() -> {
+                String message;
+                boolean ok;
+                try {
+                    // Call into the Kotlin companion validateApiKey via the Java interop
+                    kotlin.Pair<Boolean, String> p = com.codrive.ai.llm.GeminiLlmClient.Companion.validateApiKey(keyToValidate, modelToValidate);
+                    ok = p.getFirst();
+                    message = p.getSecond();
+                } catch (Exception e) {
+                    ok = false;
+                    message = e.getMessage();
+                }
+                final boolean finalOk = ok;
+                final String finalMessage = message;
+                runOnUiThread(() -> {
+                    if (finalOk) {
+                        // If validation succeeded but the validator used an alternate model formatting
+                        // (e.g. prefixed with "models/"), persist that alternate model so runtime
+                        // requests use the form that the Gemini endpoint accepted.
+                        if (finalMessage != null && finalMessage.contains("alt-model")) {
+                            String altModel = modelToValidate.startsWith("models/") ? modelToValidate : "models/" + modelToValidate;
+                            settingsStore.saveProviderAndModel(provider, altModel);
+                        }
+                        statusText.setText(R.string.settings_saved);
+                    } else {
+                        statusText.setText(getString(R.string.settings_saved_but_validation_failed, finalMessage));
+                    }
+                });
+            }).start();
+        } else {
+            statusText.setText(R.string.settings_saved);
+        }
     }
 
     private void configureInsets(View root, View content) {
@@ -123,6 +180,14 @@ public class SettingsActivity extends AppCompatActivity {
         popupMenu.getMenuInflater().inflate(R.menu.chat_navigation_menu, popupMenu.getMenu());
         popupMenu.setOnMenuItemClickListener(this::onNavigationItemClicked);
         popupMenu.show();
+    }
+
+    private void updateForProvider(LlmProvider provider) {
+        String providerModel = settingsStore.getModelFor(provider);
+        modelInput.setText(providerModel);
+        keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
+        apiKeyInput.setText("");
+        statusText.setText(R.string.settings_status_idle);
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {

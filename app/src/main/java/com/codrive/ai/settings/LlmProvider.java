@@ -33,7 +33,7 @@ public enum LlmProvider {
     }
 
     public boolean isTracerBulletSupported() {
-        return this == GROQ;
+        return this == GROQ || this == GEMINI;
     }
 }
 

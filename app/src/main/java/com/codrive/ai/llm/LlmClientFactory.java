@@ -12,10 +12,11 @@ public final class LlmClientFactory {
     }
 
     public static LlmClient create(LlmSettingsStore settingsStore) {
+        LlmProvider provider = settingsStore.getProvider();
         return createFor(
-                settingsStore.getProvider(),
-                settingsStore.getModel(),
-                settingsStore.getApiKey()
+                provider,
+                settingsStore.getModelFor(provider),
+                settingsStore.getApiKeyFor(provider)
         );
     }
 
@@ -29,7 +30,11 @@ public final class LlmClientFactory {
             return new GroqLlmClient(apiKey, model);
         }
 
-        return unsupported(provider.displayName() + " is selected, but only Groq is wired in tracer bullet right now.");
+        if (provider == LlmProvider.GEMINI) {
+            return new GeminiLlmClient(apiKey, model);
+        }
+
+        return unsupported(provider.displayName() + " is selected, but only Groq and Gemini are wired in tracer bullet right now.");
     }
 
     private static LlmClient unsupported(String message) {
