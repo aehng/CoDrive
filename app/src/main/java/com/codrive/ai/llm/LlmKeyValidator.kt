@@ -67,7 +67,7 @@ class LlmKeyValidator(
 
     companion object {
         private const val GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
-        private const val GEMINI_PREDICT_URL = "https://generativelanguage.googleapis.com/v1/models:predict"
+        private const val GEMINI_PREDICT_URL = "https://generativelanguage.googleapis.com/v1beta/models:predict"
         private const val VALIDATION_TIMEOUT_MS = 6_000
 
         private fun defaultTransport(): KeyValidationTransport = KeyValidationTransport { url, apiKey, timeoutMillis ->

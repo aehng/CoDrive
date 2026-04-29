@@ -301,7 +301,7 @@ class GeminiLlmClient @JvmOverloads constructor(
     )
 
     companion object {
-        private const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1"
+        private const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
         private fun normalizeModelName(model: String): String {
             val trimmed = model.trim()

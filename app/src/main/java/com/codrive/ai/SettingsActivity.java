@@ -19,17 +19,27 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.codrive.ai.llm.LlmModelCatalog;
+import com.codrive.ai.llm.LlmModelInfo;
+import com.codrive.ai.llm.LlmModelListResult;
 import com.codrive.ai.settings.LlmProvider;
 import com.codrive.ai.settings.LlmSettingsStore;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class SettingsActivity extends AppCompatActivity {
     private Spinner providerSpinner;
+    private Spinner modelSpinner;
     private EditText modelInput;
     private EditText apiKeyInput;
     private TextView keyPreview;
     private TextView statusText;
     private LlmSettingsStore settingsStore;
-    private static final String DEFAULT_GEMINI_MODEL = "gemma-3-27b-instruct";
+    private ArrayAdapter<String> modelAdapter;
+    private final List<LlmModelInfo> availableModels = new ArrayList<>();
+    private LlmModelCatalog modelCatalog;
+    private static final String DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,8 +55,35 @@ public class SettingsActivity extends AppCompatActivity {
         apiKeyInput = findViewById(R.id.settingsApiKeyInput);
         keyPreview = findViewById(R.id.settingsKeyPreview);
         statusText = findViewById(R.id.settingsStatusText);
+        modelSpinner = findViewById(R.id.settingsModelSpinner);
+        Button loadModelsButton = findViewById(R.id.settingsLoadModelsButton);
         Button saveButton = findViewById(R.id.settingsSaveButton);
         ImageButton menuButton = findViewById(R.id.settingsMenuButton);
+
+        modelCatalog = new LlmModelCatalog();
+
+        modelAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new ArrayList<>()
+        );
+        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        modelSpinner.setAdapter(modelAdapter);
+
+        modelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position >= 0 && position < availableModels.size()) {
+                    LlmModelInfo info = availableModels.get(position);
+                    modelInput.setText(info.getId());
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
 
         menuButton.setOnClickListener(this::showNavigationMenu);
 
@@ -82,6 +119,7 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         saveButton.setOnClickListener(v -> saveSettings());
+        loadModelsButton.setOnClickListener(v -> loadModelsForProvider());
     }
 
     private void loadCurrentSettings() {
@@ -95,6 +133,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
         keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
         statusText.setText(R.string.settings_status_idle);
+        clearModelList();
     }
 
     private void saveSettings() {
@@ -154,6 +193,65 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    private void loadModelsForProvider() {
+        LlmProvider provider = LlmProvider.values()[providerSpinner.getSelectedItemPosition()];
+        String enteredKey = apiKeyInput.getText().toString().trim();
+        String storedKey = settingsStore.getApiKeyFor(provider);
+        String keyToUse = !TextUtils.isEmpty(enteredKey) ? enteredKey : storedKey;
+        if (TextUtils.isEmpty(keyToUse)) {
+            statusText.setText(R.string.settings_status_models_missing_key);
+            return;
+        }
+        statusText.setText(R.string.settings_status_loading_models);
+        new Thread(() -> {
+            LlmModelListResult result = modelCatalog.fetch(provider, keyToUse);
+            runOnUiThread(() -> handleModelListResult(result));
+        }).start();
+    }
+
+    private void handleModelListResult(LlmModelListResult result) {
+        if (!result.getSuccess()) {
+            statusText.setText(getString(R.string.settings_status_models_failed, result.getMessage()));
+            clearModelList();
+            return;
+        }
+        List<LlmModelInfo> models = result.getModels();
+        if (models == null || models.isEmpty()) {
+            statusText.setText(R.string.settings_status_models_empty);
+            clearModelList();
+            return;
+        }
+        availableModels.clear();
+        availableModels.addAll(models);
+        modelAdapter.clear();
+        for (LlmModelInfo info : models) {
+            modelAdapter.add(info.getDisplayName());
+        }
+        modelAdapter.notifyDataSetChanged();
+        statusText.setText(R.string.settings_status_models_loaded);
+
+        String currentModel = modelInput.getText().toString().trim();
+        int selection = findModelIndex(currentModel);
+        if (selection >= 0) {
+            modelSpinner.setSelection(selection);
+        }
+    }
+
+    private int findModelIndex(String modelId) {
+        for (int i = 0; i < availableModels.size(); i++) {
+            if (availableModels.get(i).getId().equals(modelId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void clearModelList() {
+        availableModels.clear();
+        modelAdapter.clear();
+        modelAdapter.notifyDataSetChanged();
+    }
+
     private void configureInsets(View root, View content) {
         final int baseRootBottom = root.getPaddingBottom();
         final int baseContentBottom = content.getPaddingBottom();
@@ -188,6 +286,7 @@ public class SettingsActivity extends AppCompatActivity {
         keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
         apiKeyInput.setText("");
         statusText.setText(R.string.settings_status_idle);
+        clearModelList();
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {

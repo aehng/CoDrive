@@ -61,4 +61,11 @@
     <string name="overlay_listening_push_to_talk_active">Listening (push-to-talk)...</string>
     <string name="overlay_listening_push_to_talk_idle">Mic muted. Release complete.</string>
     <string name="main_mic_permission_required">Allow microphone access so CoDrive can listen continuously.</string>
+    <string name="settings_model_list_label">Available models</string>
+    <string name="settings_load_models_button">Load Models</string>
+    <string name="settings_status_loading_models">Loading models...</string>
+    <string name="settings_status_models_loaded">Models loaded. Select one or enter a custom model.</string>
+    <string name="settings_status_models_failed">Model list failed: %1$s</string>
+    <string name="settings_status_models_missing_key">Enter an API key to load models.</string>
+    <string name="settings_status_models_empty">No models returned for this provider.</string>
 </resources>

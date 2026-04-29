@@ -15,7 +15,7 @@ public class LlmSettingsStore {
     private static final String KEY_API_KEY_PREFIX = "api_key_";
 
     private static final String GROQ_DEFAULT_MODEL = "qwen/qwen3-32b";
-    private static final String GEMINI_DEFAULT_MODEL = "gemma-3-27b-instruct";
+    private static final String GEMINI_DEFAULT_MODEL = "gemini-1.5-flash";
 
     private final SharedPreferences prefs;
 
