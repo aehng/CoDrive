@@ -6,57 +6,54 @@
 
 Package: `com.codrive.ai` | Target: Samsung S25 FE (8GB RAM) | SDK: Min 33 (Android 13), Target 35
 
-Last updated: 2026-04-23
+Last updated: 2026-05-03
 
-## 1. Project Identity & Overview
+Overview
+--------
+- Core idea: Android Accessibility Service as a voice-controlled "Agentic Proxy" (STT -> Scrape -> LLM -> Execute).
+- Architecture: Native Android (Kotlin). Cloud-Brain / Local-Memory / Local-Voice hybrid.
+- Methodology: Tracer-Bullet vertical-slice first (complete flow end-to-end), then expand.
 
-Core Paradigm: An Android Accessibility Service acting as a voice-controlled "Agentic Proxy." It scrapes the UI, processes reasoning via the cloud, and executes physical screen interactions hands-free.
+Status checklist (high-level)
+-----------------------------
+- [x] Phase 0 — Baseline: manifest, permissions, accessibility config
+- [x] Phase 1 — Core models & interfaces (PrunedNodeEntry, PrunedUiMap, AgentDecision, ExecutionResult, SttEngine, TtsEngine, LlmClient, ActionExecutor, Settings UI, Encrypted key storage)
+- [x] Phase 2 — Semantic pruner, registry, semantic merging, unit tests
+- [x] Phase 3 — Groq client + strict JSON handling + runtime wiring for selected provider/model/key
+- [x] Phase 4 — Action execution: anti-stale checks, focus-before-type, gestures
+- [x] Phase 5 — Orchestrator + overlay bubble + launcher seams
+- [x] Immediate: overlay bubble entrypoint documented (See `docs/overlay-bubble-entrypoint.md`)
 
-Architecture: Native Android (Kotlin). Cloud-Brain / Local-Memory / Local-Voice Hybrid.
+2. Brain: LLM & API
+--------------------
+- Provider (default): Groq
+- Default model: `qwen/qwen3-32b` (expect strict JSON-only output)
 
-Methodology: "Tracer Bullet" — priority on one complete vertical slice (STT -> Scrape -> Groq -> Click) before full subsystem integration.
+API key policy and Settings UX (tasks)
 
-## 2. The "Brain" (LLM & API)
+- [x] Provide a secure Settings screen for user-provided API keys and provider/model selection
+- [x] Persist provider/model selection in cleartext settings
+- [x] Store API keys encrypted at runtime (EncryptedSharedPreferences or Keystore-backed storage)
+- [ ] Add a debug-only import path from `local.properties` gated behind a debug flag for development
+- [x] Implement lightweight validation call on key entry (low cost) and show success/failure in UI
+- [x] Implement provider-adapter pattern in `LlmClient` so runtime wiring uses selected provider/model/key
+- [x] Ensure prompt contract: model returns raw JSON object only (no explanatory text or markdown)
 
-Provider: Groq API
+Developer notes (security & logging)
 
-Model: qwen/qwen3-32b (Standard JSON output, no reasoning stream overhead).
+- Mask keys in the UI after entry (show only last 4 chars)
+- Allow users to rotate/remove keys at any time
+- Never log full keys or prompts in production; logging may include provider/model selection only
 
-API Key Management: Stored strictly in `local.properties` as `GROQ_API_KEY` and injected into the app via Gradle `buildConfigField`. Never commit secrets to Git.
+Free-tier limits (Apr 2026) — operational constraints
 
-User-provided API keys & model selection (Settings UX)
+- RPM: 60 requests/min
+- TPM: 6,000 tokens/min (primary guardrail)
+- RPD: 1,000 requests/day
 
-- The app must provide a secure Settings screen where users can add their own API keys and choose a provider and model. This enables users to use personal Groq keys or other providers (Gemini, OpenAI) without modifying the build.
-- Storage: Store user-entered API keys using `EncryptedSharedPreferences` or another Keystore-backed mechanism. Do NOT store user API keys in plaintext or commit them.
-- Dev vs Runtime keys:
-  - `local.properties` and Gradle `buildConfigField` may be used for development/test keys only (debug builds). User-entered keys must be stored encrypted at runtime.
-  - Optionally provide a debug-only import path for `GROQ_API_KEY` from `local.properties` (gated behind a debug flag) to ease developer testing.
-- Provider/model selection:
-  - Ship the tracer-bullet with a default runtime provider/model: Groq `qwen/qwen3-32b` (hardcoded default) to ensure consistent early behavior.
-  - The Settings screen should allow choosing a provider (Groq, Gemini, OpenAI, Custom HTTP) and entering the model identifier string for that provider.
-  - Implement a provider-adapter pattern in `LlmClient` so the runtime request wiring uses the selected provider/model and key without changing app logic.
-  - On key entry, run a lightweight validation call and show success/failure in the UI (avoid expensive token-consuming requests during validation).
-  - Prompt contract: model output must be raw JSON only. Do not emit conversational text, explanations, or markdown blocks outside the JSON object.
+- Token/Rate guidance: keep UI payloads small (aggressive pruning). Implement Retry-After handling for 429s.
 
-Security & UX guidance:
-
-- Mask keys in the UI after entry (show only last 4 characters). Allow users to rotate/remove keys at any time.
-- Persist selected provider/model in cleartext settings but keep the API key encrypted.
-- Log provider/model selection (not the key) for debugging. Never log full keys or prompt content in production.
-
-
-Confirmed Free Tier Limits (April 2026)
-
-- RPM: 60 requests per minute
-- TPM: 6,000 tokens per minute (tightest bottleneck)
-- RPD: 1,000 requests per day
-
-Operational Constraints
-
-- TPM Guardrail: With 6K TPM, the UI Scraper MUST be highly aggressive in pruning to keep the payload small.
-- Budgeting: At 60 RPM, rate-limit risk shifts to token weight. Keep UI maps small.
-
-Strict JSON Schema (strict: true)
+Strict action JSON schema (enforced)
 
 {
   "action_type": "CLICK | TYPE | SCROLL | HOME | BACK | RECENTS | OPEN_NOTIFICATIONS | OPEN_QUICK_SETTINGS | OPEN_POWER_DIALOG | LOCK_SCREEN | TAKE_SCREENSHOT | SWIPE_DOWN | SWIPE_UP | SWIPE_LEFT | SWIPE_RIGHT | SEARCH_MEMORY | RESPOND | FINISH",
@@ -67,165 +64,185 @@ Strict JSON Schema (strict: true)
   "confidence_score": 0.0
 }
 
-## 3. The "Eyes" (Semantic Pruner)
+3. Eyes: Semantic Pruner (Accessibility scraper)
+----------------------------------------------
 
-Engine: Android `AccessibilityService`.
+Design and invariants
+- Engine: Android `AccessibilityService` using recursive DFS over `AccessibilityNodeInfo` tree
+- Retain nodes only if they have `text`, `contentDescription`, or are interactive (`isClickable`, `isEditable`, `isCheckable`)
+- Role mapping (explicit):
+  - `isEditable == true` -> `role: input`
+  - `isCheckable == true` -> `role: checkbox`
+  - `isClickable == true` -> `role: button`
+  - else -> `role: text`
 
-Algorithm: Recursive DFS traversal of the active `AccessibilityNodeInfo` tree.
+Registry & memory
+- Build a fresh `HashMap<Int, AccessibilityNodeInfo>` per snapshot mapping temporary index -> live node
+- MUST call `node.recycle()` on every processed child to avoid memory leaks on target device
+- Each pruned node record must include:
+  - `index: Int` (temporary crawl id)
+  - `bounds: [left, top, right, bottom]` (absolute screen coordinates)
 
-Retention Criteria: Keep nodes ONLY if they have `text`, `contentDescription`, or are interactive (`isClickable`, `isEditable`, `isCheckable`).
+Failsafe
+- If zero interactable nodes found: trigger VLM fallback path (Tier 3) or TTS: "This screen is unreadable." depending on mode
 
-RAM Management: Mandatory `node.recycle()` on every processed child during traversal to prevent memory leaks on the S25 FE.
+Pruner tasks
 
-State Management: A `HashMap<Int, AccessibilityNodeInfo>` maps the AI-provided index back to a live UI node. This map is rebuilt on each snapshot and old indices are invalidated.
+- [x] Implement DFS pruner that recycles children as it goes
+- [x] Produce `PrunedUiMap` in the compact tuple format for token savings (see UI Map section)
 
-Failsafe: If zero interactable nodes are found, trigger the VLM fallback path (Tier 3) or speak: "This screen is unreadable." depending on mode.
+4. Memory: Local Database & RAG (Room)
+-------------------------------------
 
-Role mapping (explicit):
-- `isEditable == true` -> `role: input`
-- `isCheckable == true` -> `role: checkbox`
-- `isClickable == true` -> `role: button`
-- else -> `role: text`
+- Substrate: Android Room (SQLite)
+- Tables:
+  - `IdentityEntity` (indefinite retention): name, phone, resume, bio (user-managed)
+  - `SessionContextEntity` (ephemeral, 1-hour TTL): short-term turn history
 
-Each kept node MUST include:
-- `index: Int` (temporary crawl id)
-- `bounds: [left, top, right, bottom]` (absolute screen coordinates)
+SEARCH_MEMORY loop
+- If model returns `action_type: SEARCH_MEMORY` with `tool_query`, query Room, append results to model context, re-query until a terminal action is returned
 
-Runtime requirement: Rebuild registry per snapshot and call `node.recycle()` on processed child nodes to avoid RAM bloat.
+Memory tasks
 
-## 4. The "Memory" (Local Database & RAG)
+- [x] Implement Room schema and DAO for IdentityEntity and SessionContextEntity
+- [x] Add TTL purge for `SessionContextEntity` (purge after background or 60 minutes)
 
-Substrate: Android Room Persistence Library (SQLite).
+5. Voice: Local Audio Stack
+---------------------------
 
-Local Tables:
+- STT: Sherpa-ONNX (local, streaming)
+- TTS: Piper (local, low-latency)
+- Sync: TTS narrates `voice_feedback` asynchronously while actions execute
 
-- `IdentityEntity`: Indefinite retention. Stores name, phone, resume, bio. User-managed via settings.
-- `SessionContextEntity`: Ephemeral (1-hour TTL). Stores short-term turn history and is purged on background or after 60 minutes.
+Voice tasks
 
-SEARCH_MEMORY Loop: Groq may return `action_type: SEARCH_MEMORY` and a `tool_query`. App queries Room, appends results to model context, and re-queries Groq until terminal action.
+- [ ] Integrate Sherpa-ONNX for STT
+- [ ] Integrate Piper for TTS
 
-## 5. The "Voice" (Local Audio Stack)
+6. Hands: Execution (Action Executor)
+------------------------------------
 
-STT: Sherpa-ONNX (Local/Offline) — streaming.
+Execution rules
+- Map `target_index` -> live `AccessibilityNodeInfo` via registry
+- Before acting: call `node.refresh()`; if `false` then abort and re-scrape
+- Tap: compute midpoint of `bounds` and dispatch `GestureDescription` at that point
+- Type: use `ACTION_SET_TEXT` for editable nodes
 
-TTS: Piper (Local/Offline) — low-latency neural.
+Risk taxonomy and gating
+- Tier 1 — Navigation (low risk): SCROLL, CLICK on navigation elements — implicit confirmation
+- Tier 2 — Data mutation (medium risk): TYPE, CLICK toggles — if `confidence_score < 0.8` ask clarification
+- Tier 3 — External/Destructive (high risk): submits, purchases, deletes — require explicit confirmation (TTS ask "Confirm?")
 
-Sync: TTS narrates `voice_feedback` asynchronously while the physical action executes.
+Execution tasks
 
-## 6. The "Hands" (Execution)
+- [x] Implement `ActionExecutor` with midpoint tap and ACTION_SET_TEXT support
+- [x] Implement anti-stale: `node.refresh()` checks and re-scrape fallback
+- [ ] Implement Tiered confirmation gating
 
-Mapping: Retrieve live `AccessibilityNodeInfo` via `target_index` from the registry.
+7. Interaction Waterfall
+-----------------------
 
-Tap: Calculate midpoint (x, y) of node `bounds` and dispatch `GestureDescription` at that point.
+- Tier 1 (Local): local regex router for trivial commands (Home, Back, Scroll)
+- Tier 2 (Cloud): full scrape -> pruned ui map -> LLM inference -> parse strict JSON -> execute
+- Tier 3 (VLM fallback): when pruner finds zero interactable nodes, use local VLM to ground coordinates
 
-Type: Use `ACTION_SET_TEXT` for editable nodes where appropriate.
+Session continuity (implemented)
 
-Anti-Stale: Always call `node.refresh()` before acting. If `refresh()` returns false, abort and re-scrape.
+- [x] Keep a short-lived in-memory conversation buffer between mic taps
+- [x] Session timeout: 30s of inactivity clears the buffer
+- [x] Persist short history for clarification/RESPOND turns
+- [x] Clear history after terminal action or successful physical execution
 
-Risky-Action Taxonomy (Explicit vs Implicit Confirmation)
+8. Tier 3: VLM Fallback (merged & revised)
+-----------------------------------------
 
-Tier 1 — Navigation (Low Risk): `SCROLL`, `CLICK` on navigation elements (tabs, "Next").
-  - Implicit confirmation: execute and narrate.
+When accessibility scraping yields no interactable nodes, a small local VLM will ground coordinates.
 
-Tier 2 — Data Mutation (Medium Risk): `TYPE`, `CLICK` on checkboxes/toggles.
-  - Implicit confirmation with reversibility. If `confidence_score < 0.8`, ask for clarification and stop.
+- Current/previous models: Qwen2-VL-0.5B-Instruct (INT4) — upgraded recommendation: `InternVL2-1B` for better grounding accuracy
+- Run the local VLM via `llama.cpp` with QNN/Hexagon backend where available to leverage device NPU
+- Enforce strict JSON/GBNF output from VLM: e.g. `{ "x": 123, "y": 456 }` in absolute px reference frame
+- Add a snap-radius routine: search for pruned nodes within radius (dp->px conversion) and snap to node center; otherwise perform raw tap
 
-Tier 3 — External-send / Destructive (High Risk): `CLICK` on submits, purchases, deletes.
-  - Explicit confirmation required. TTS asks for "Confirm?" and waits for user "Yes" before executing.
+VLM tasks
 
-## 7. Interaction Waterfall
+- [ ] Integrate local VLM runtime and strict-output verifier
+- [ ] Implement snap-radius search and raw-tap fallback
 
-Tier 1 (Local): Local regex router for simple commands (Go Home, Back, Scroll).
-Tier 2 (Cloud): Full scrape + Groq decision.
-Tier 3 (VLM Fallback): If scraper finds zero interactable nodes, use local VLM to ground coordinates.
+9. Safety & Edge Cases
+----------------------
 
-Active session continuity (implemented):
-- Keep a short-lived in-memory conversation buffer between mic taps.
-- Session timeout: 30 seconds of inactivity, then clear context.
-- Persist history for clarification or conversational `RESPOND` turns.
-- Clear history after successful physical execution or terminal completion.
+- Dead-Zone Sentry: on connectivity loss, stop TTS, say "Connection lost. Pausing CoDrive.", unbind scraper and pause. On reconnect: "Connection restored." and await user.
+- Do not queue actions while offline
 
-## 8. Tier 3: VLM Fallback Path
+Safety tasks
 
-Model: Qwen2-VL-0.5B-Instruct (INT4 quantized locally).
+- [ ] Implement ConnectivityManager hook to pause/unpause system and TTS
 
-Trigger: Accessibility tree has zero interactable nodes.
+10. Future: Navigation Knowledge Base (PKB)
+----------------------------------------
 
-Coordinate Grounding: VLM returns a point; system searches for nodes within a snap radius (dp -> px conversion). If found, snap to node center; otherwise tap raw coordinates.
+- Store repeatable success paths (multi-step flows) in Room so frequent flows can run locally without cloud calls
 
-## 9. Safety & Edge Cases
+PKB tasks
 
-Dead-Zone Sentry (ConnectivityManager): Immediately stop TTS and say: "Connection lost. Pausing CoDrive." Unbind scraper and pause execution. On reconnect, say: "Connection restored." and await next user command.
+- [ ] Design PKB schema and execution runner
 
-No action queueing: Do not queue actions while offline.
+Tracer Bullet & Phase Discipline
+--------------------------------
 
-## 10. Future: Navigation Knowledge Base (PKB)
+Phases (tracer-bullet priority):
 
-Store repeatable success paths in Room so frequently-used multi-step flows can be executed locally without repeated Groq calls.
+- Phase 0 — Baseline (manifest, permissions, accessibility config)
+- Phase 1 — Core models & interfaces + Settings UI + Encrypted key storage
+- Phase 2 — Pruner & registry + unit tests
+- Phase 3 — Groq client + strict JSON handling + runtime wiring
+- Phase 4 — Action execution, anti-stale, gestures
+- Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback)
 
-## Tracer Bullet & Phase Discipline
+Immediate next steps
 
-Follow phase-by-phase execution. The tracer bullet vertical slice is the immediate priority:
+- [x] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity` (`docs/overlay-bubble-entrypoint.md`)
+- [x] Implement the minimal tracer-bullet vertical slice: hardcoded trigger -> pruner -> Groq -> strict JSON -> node.refresh() -> simulated dispatchGesture
 
-Phase 0 — Baseline: Manifest, permissions, accessibility config.
-Phase 1 — Core models/interfaces: `PrunedNodeEntry`, `PrunedUiMap`, `AgentDecision`, `ExecutionResult`, `SttEngine`, `TtsEngine`, `LlmClient`, `ActionExecutor`. Also add a Settings UI (secure API key entry, provider & model selection) and encrypted runtime storage for user keys.
-Phase 2 — Semantic pruner, registry, semantic merging, and unit tests.
-Phase 3 — Groq client, strict JSON-only handling, and runtime wiring so the selected provider/model and encrypted key from Settings are used at request time.
-Phase 4 — Action execution with anti-stale checks, focus-before-type behavior, and gesture/global-action dispatch.
-Phase 5 — Orchestrator (chat overlay -> prune -> infer -> execute -> feedback) plus launcher-ready seams for a persistent overlay bubble.
+Developer Notes & Conventions
+-----------------------------
 
-Immediate next implementation TODOs:
-- [x] Document and prepare the overlay bubble entrypoint so the launcher can live outside `ChatActivity`. (See `docs/overlay-bubble-entrypoint.md`)
+- Secrets: keep `GROQ_API_KEY` in `local.properties` only for dev/debug. User keys must be encrypted at runtime.
+- Tests: every new Kotlin class should have a JUnit test under `app/src/test`
+- Recycle discipline: call `node.recycle()` for every processed child
+- UX: do not auto-open accessibility settings on boot; show "Service OFF" and require explicit user tap to open accessibility settings
 
+Open Decisions (recorded)
+-------------------------
 
-Definition of Done (Tracer Bullet MVP):
-- A hardcoded trigger flows into the Pruner -> Groq -> strict JSON parse -> `node.refresh()` -> simulated `dispatchGesture` (on-device) with clear test steps and JUnit coverage.
+1) Feedback channel — options:
+   [X] Option A: model `voice_feedback` + executor result (voice narrative)
+   - Option B: executor-only status text (concise)
+   [X] Option C: dual-line UI (decision + action outcome) — recommended for UI; Option A for TTS
+Verdict: voice feedback only for tts but on the ui we should display what the ai did and the speech it is reading
 
-## Developer Notes & Conventions
+Additional Plan Updates
+-----------------------
 
-- Secrets: Keep `GROQ_API_KEY` in `local.properties` only.
-- Tests: Every new Kotlin class should have a JUnit test in `app/src/test`.
-- Recycle discipline: Call `node.recycle()` for every processed child.
-- UX: Do not auto-open accessibility settings on boot. Subsequent boots should show "Service OFF" and a button to open settings manually. The app should only navigate to the accessibility settings after an explicit user tap in the app.
+UI Map Optimization (the tuple format)
 
-## Open Decisions (Record)
+- Format: compact 4-item tuple: [index, role, [centerX, centerY], "text"]
+- Role minification: `"b"` (button), `"i"` (input), `"c"` (checkbox), `"t"` (text)
+- Rationale: token savings (~60%) to respect TPM guardrails
 
-1. Service access pattern: Option A static instance on `CoDriveAccessibilityService`, Option B bound service bridge, Option C callback registry. (See design doc below.)
+ - [x] Implement `PrunedUiMap` serializer producing tuple form and make prompts document tuple semantics
 
-2. Feedback channel: Option A append model `voice_feedback` + executor result, Option B executor-only status text, Option C dual-line "decision + action outcome." (See tradeoffs below.)
+Logic & Orchestration updates
 
-### Service Access Patterns — short explainer
+- [ ] Add `Retry-After` logic to `InferenceLoopRunner` to respect 429 responses and avoid tight retries
+- [x] Update `UiTreePruner` to merge child text into clickable parent containers where appropriate (e.g., list rows)
+- [x] Maintain `ActiveSessionHistory` in RAM for 30s (clarification support)
 
-- Option A — Static instance on `CoDriveAccessibilityService`:
-  - Pros: Simple global access, minimal IPC. Easy for quick tracer-bullet wiring.
-  - Cons: Global mutable state, harder to test, potential lifecycle coupling.
+Agentic Batching (open)
 
-- Option B — Bound Service Bridge:
-  - Pros: Strong lifecycle contract, easier to mock and unit-test, follows Android service binding patterns.
-  - Cons: More boilerplate; slightly more complex for fast prototyping.
+- Consider allowing the cloud model to return a LIST of actions for multi-step execution. Tradeoffs:
+  - Pros: fewer round trips
+  - Cons: increased risk and rollback complexity
+- Recommendation: gate behind experiment flag with stricter thresholds and confirmation rules
 
-- Option C — Callback Registry (observer pattern):
-  - Pros: Decoupled, scalable for multiple clients (UI, overlay, tests).
-  - Cons: More plumbing; coordination complexity.
-
-Recommendation for tracer-bullet: Start with Option A to move fast, then migrate to Option B/C when expanding.
-
-### Feedback Channel Options — short explainer
-
-- Option A — Append model `voice_feedback` + executor result:
-  - Pros: Rich narrative; good for voice UX.
-  - Cons: Longer messages may be noisy in the chat transcript.
-
-- Option B — Executor-only status text:
-  - Pros: Concise; easy to present in UI.
-  - Cons: Loses model rationale.
-
-- Option C — Dual-line "decision + action outcome":
-  - Pros: Best of both worlds — shows model decision (first line) and concise executor result (second line).
-  - Cons: Slightly more UI complexity.
-
-Recommendation: Implement Option C in the UI (dual-line) and use Option A for voice output when TTS is available.
-
----
-
-If anything above needs to be split into smaller actionable tasks, tell me which area to start implementing next and I'll create concrete TODOs and scaffold the first tracer-bullet files.
+-- end
