@@ -37,7 +37,22 @@ public class LlmSettingsStore {
             );
             return new LlmSettingsStore(encryptedPrefs);
         } catch (Exception e) {
-            throw new IllegalStateException("Unable to initialize secure key storage.", e);
+            try {
+                context.deleteSharedPreferences(PREF_FILE);
+                MasterKey masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+                SharedPreferences encryptedPrefs = EncryptedSharedPreferences.create(
+                        context,
+                        PREF_FILE,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                return new LlmSettingsStore(encryptedPrefs);
+            } catch (Exception retryException) {
+                throw new IllegalStateException("Unable to initialize secure key storage.", retryException);
+            }
         }
     }
 

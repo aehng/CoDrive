@@ -36,6 +36,10 @@
             android:name=".SettingsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".bootstrap.ModelBootstrapActivity"
+            android:exported="false" />
+
         <service
             android:name=".overlay.OverlayBubbleService"
             android:exported="false" />

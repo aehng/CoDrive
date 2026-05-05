@@ -13,7 +13,8 @@ class ContinuousSpeechRecognizer(
     private val context: Context,
     private val callbacks: Callbacks,
     private val endpointer: SpeechCommandEndpointer = SpeechCommandEndpointer(),
-) {
+    private val languageTag: String? = null,
+) : OverlaySpeechRecognizer {
     interface Callbacks {
         fun onListeningStateChanged(message: String)
         fun onSpeechDetected()
@@ -26,7 +27,7 @@ class ContinuousSpeechRecognizer(
     private var recognizer: SpeechRecognizer? = null
     private var running = false
 
-    fun start() {
+    override fun start() {
         if (running) {
             return
         }
@@ -37,7 +38,15 @@ class ContinuousSpeechRecognizer(
 
         running = true
         if (recognizer == null) {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+            val onDeviceRecognizer = runCatching {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            }.getOrNull()
+            if (onDeviceRecognizer == null) {
+                callbacks.onListeningStateChanged("On-device speech recognition unavailable.")
+                running = false
+                return
+            }
+            recognizer = onDeviceRecognizer.apply {
                 setRecognitionListener(buildListener())
             }
         }
@@ -46,7 +55,7 @@ class ContinuousSpeechRecognizer(
         startListeningSoon(50L)
     }
 
-    fun stop() {
+    override fun stop() {
         running = false
         mainHandler.removeCallbacksAndMessages(null)
         recognizer?.apply {
@@ -77,6 +86,10 @@ class ContinuousSpeechRecognizer(
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 600L)
+            if (!languageTag.isNullOrBlank()) {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
+            }
         }
 
         runCatching {
@@ -112,6 +125,14 @@ class ContinuousSpeechRecognizer(
 
             override fun onError(error: Int) {
                 if (!running) {
+                    return
+                }
+                if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
+                    callbacks.onListeningStateChanged(
+                        "Offline speech recognition unavailable. Install an offline language pack."
+                    )
+                    callbacks.onCommandRejected("Offline speech recognition unavailable.")
+                    stop()
                     return
                 }
                 callbacks.onListeningStateChanged(errorMessage(error))
@@ -159,7 +180,7 @@ class ContinuousSpeechRecognizer(
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected."
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy. Restarting..."
             SpeechRecognizer.ERROR_NETWORK,
-            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network issue. Continuing offline if available..."
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Offline speech recognition unavailable."
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Mic permission missing."
             else -> "Recognizer error. Restarting..."
         }

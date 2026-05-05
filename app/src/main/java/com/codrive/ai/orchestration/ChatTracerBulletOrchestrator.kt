@@ -7,15 +7,21 @@ import com.codrive.ai.model.ActionType
 import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.ExecutionResult
 import com.codrive.ai.model.PrunedUiMap
+import com.codrive.ai.vlm.InternVlRuntime
 import java.util.function.BiFunction
 
-class ChatTracerBulletOrchestrator(
+class ChatTracerBulletOrchestrator @JvmOverloads constructor(
     private val decisionRunner: BiFunction<String, PrunedUiMap, AgentDecision>,
     private val actionExecutor: ActionExecutor,
     private val registryBinder: RegistryBinder = RegistryBinder { },
+    private val vlmRuntime: InternVlRuntime? = null,
 ) {
     fun run(command: String, pruningOutcome: PruningOutcome): TracerBulletResult {
         if (pruningOutcome.isUnreadable) {
+            // Pre-load VLM assets when available so Tier 3 fallback can be fast.
+            vlmRuntime?.let { runtime ->
+                runCatching { runtime.ensureLoaded() }
+            }
             val message = pruningOutcome.unreadableMessage ?: "This screen is unreadable."
             return TracerBulletResult(
                 finalFeedback = message,

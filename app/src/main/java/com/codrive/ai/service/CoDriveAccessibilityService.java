@@ -4,10 +4,12 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 public class CoDriveAccessibilityService extends AccessibilityService {
+    private static final String TAG = "CoDriveAccessibility";
     private static volatile CoDriveAccessibilityService instance;
     private final Object rootLock = new Object();
     private AccessibilityNodeInfo latestExternalRoot;
@@ -20,10 +22,12 @@ public class CoDriveAccessibilityService extends AccessibilityService {
     protected void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        Log.i(TAG, "Accessibility service connected.");
     }
 
     @Override
     public void onDestroy() {
+        Log.i(TAG, "Accessibility service destroyed.");
         synchronized (rootLock) {
             if (latestExternalRoot != null) {
                 latestExternalRoot.recycle();

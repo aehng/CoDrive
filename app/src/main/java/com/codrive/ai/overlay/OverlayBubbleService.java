@@ -36,6 +36,7 @@ import com.codrive.ai.accessibility.UiTreePruner;
 import com.codrive.ai.execution.AccessibilityActionExecutor;
 import com.codrive.ai.execution.AccessibilityRuntimeAdapter;
 import com.codrive.ai.launcher.ChatLauncherEntryPoint;
+import com.codrive.ai.contracts.TtsEngine;
 import com.codrive.ai.llm.LlmClientFactory;
 import com.codrive.ai.memory.IdentityDatabase;
 import com.codrive.ai.memory.MemorySearchTool;
@@ -50,10 +51,19 @@ import com.codrive.ai.orchestration.Tier1NavigationDirective;
 import com.codrive.ai.orchestration.Tier1NavigationRouter;
 import com.codrive.ai.orchestration.TracerBulletResult;
 import com.codrive.ai.overlay.stt.ContinuousSpeechRecognizer;
+import com.codrive.ai.overlay.stt.OverlaySpeechRecognizer;
 import com.codrive.ai.overlay.stt.SpeechCommandEndpointer;
 import com.codrive.ai.settings.LlmSettingsStore;
+import com.codrive.ai.settings.VoiceSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
+import com.codrive.ai.voice.AndroidTextToSpeechEngine;
+import com.codrive.ai.voice.SherpaTtsEngine;
+import com.codrive.ai.voice.VoiceEngineFactory;
+import com.codrive.ai.modeldownload.ModelStorage;
+import com.codrive.ai.vlm.InternVlModelLoader;
+import com.codrive.ai.vlm.InternVlRuntime;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -84,11 +94,16 @@ public class OverlayBubbleService extends Service {
     private ExecutorService backgroundExecutor;
     private IdentityDatabase identityDatabase;
     private LlmSettingsStore llmSettingsStore;
+    private VoiceSettingsStore voiceSettingsStore;
     private ActiveSessionManager activeSessionManager;
-    private ContinuousSpeechRecognizer continuousSpeechRecognizer;
+    private OverlaySpeechRecognizer continuousSpeechRecognizer;
     private UiTreePruner uiTreePruner;
     private IncrementalRequestManager incrementalRequestManager;
     private final SpeechCommandEndpointer overlayEndpointer = new SpeechCommandEndpointer();
+    private final SpeechCommandEndpointer recognizerEndpointer = new SpeechCommandEndpointer();
+    private ContinuousSpeechRecognizer.Callbacks speechCallbacks;
+    private TtsEngine ttsEngine;
+    private InternVlRuntime vlmRuntime;
     private final Runnable autoSubmitRunnable = new Runnable() {
         @Override
         public void run() {
@@ -116,12 +131,13 @@ public class OverlayBubbleService extends Service {
                 "codrive_identity.db"
         ).build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
+        voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager();
         uiTreePruner = new UiTreePruner();
+        ModelStorage storage = new ModelStorage(new File(getApplicationContext().getNoBackupFilesDir(), "models"));
+        vlmRuntime = new InternVlRuntime(new InternVlModelLoader(storage));
         incrementalRequestManager = new IncrementalRequestManager(backgroundExecutor);
-        continuousSpeechRecognizer = new ContinuousSpeechRecognizer(
-                getApplicationContext(),
-                new ContinuousSpeechRecognizer.Callbacks() {
+        speechCallbacks = new ContinuousSpeechRecognizer.Callbacks() {
                     @Override
                     public void onListeningStateChanged(String message) {
                         mainHandler.post(() -> updateListeningStatus(message));
@@ -166,9 +182,8 @@ public class OverlayBubbleService extends Service {
                             }
                         });
                     }
-                },
-                new SpeechCommandEndpointer()
-        );
+                };
+        refreshVoiceEngines(true);
         incrementalRequestManager.registerCallback(result -> mainHandler.post(() -> {
             if (sendButton != null) {
                 sendButton.setEnabled(true);
@@ -195,6 +210,8 @@ public class OverlayBubbleService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+
+        refreshVoiceEngines(false);
 
         if (!Settings.canDrawOverlays(this)) {
             promptOverlayPermission();
@@ -223,11 +240,68 @@ public class OverlayBubbleService extends Service {
         if (continuousSpeechRecognizer != null) {
             continuousSpeechRecognizer.stop();
         }
+        releaseTtsEngine();
         if (identityDatabase != null) {
             identityDatabase.close();
         }
         detachOverlay();
         super.onDestroy();
+    }
+
+    private void refreshVoiceEngines(boolean force) {
+        boolean shouldUseSherpaTts = VoiceEngineFactory.shouldUseSherpaTts(this, voiceSettingsStore);
+        boolean shouldUseSherpaStt = VoiceEngineFactory.shouldUseSherpaStt(getApplicationContext(), voiceSettingsStore);
+
+        if (force || shouldRecreateTts(shouldUseSherpaTts)) {
+            releaseTtsEngine();
+            ttsEngine = VoiceEngineFactory.createTtsEngine(this, voiceSettingsStore);
+        }
+
+        if (force || shouldRecreateStt(shouldUseSherpaStt)) {
+            if (continuousSpeechRecognizer != null) {
+                continuousSpeechRecognizer.stop();
+            }
+            continuousSpeechRecognizer = VoiceEngineFactory.createOverlaySpeechRecognizer(
+                    getApplicationContext(),
+                    speechCallbacks,
+                    recognizerEndpointer,
+                    voiceSettingsStore.getSttLocaleTag(),
+                    voiceSettingsStore
+            );
+        }
+
+        if (overlayRoot != null && isContinuousListeningEnabled()) {
+            startContinuousVoiceMode();
+        }
+    }
+
+    private boolean shouldRecreateTts(boolean shouldUseSherpa) {
+        if (ttsEngine == null) {
+            return true;
+        }
+        boolean isSherpa = ttsEngine instanceof SherpaTtsEngine;
+        return isSherpa != shouldUseSherpa;
+    }
+
+    private boolean shouldRecreateStt(boolean shouldUseSherpa) {
+        if (continuousSpeechRecognizer == null) {
+            return true;
+        }
+        boolean isSherpa = continuousSpeechRecognizer instanceof com.codrive.ai.overlay.stt.SherpaSpeechRecognizer;
+        return isSherpa != shouldUseSherpa;
+    }
+
+    private void releaseTtsEngine() {
+        if (ttsEngine == null) {
+            return;
+        }
+        ttsEngine.stop();
+        if (ttsEngine instanceof AndroidTextToSpeechEngine) {
+            ((AndroidTextToSpeechEngine) ttsEngine).shutdown();
+        } else if (ttsEngine instanceof SherpaTtsEngine) {
+            ((SherpaTtsEngine) ttsEngine).shutdown();
+        }
+        ttsEngine = null;
     }
 
     private void ensureOverlayAttached() {
@@ -347,6 +421,10 @@ public class OverlayBubbleService extends Service {
             return;
         }
 
+        if (ttsEngine != null) {
+            ttsEngine.stop();
+        }
+
         if (TextUtils.isEmpty(command)) {
             Toast.makeText(this, R.string.chat_enter_command_first, Toast.LENGTH_SHORT).show();
             return;
@@ -374,12 +452,16 @@ public class OverlayBubbleService extends Service {
         if (result.getExecutionResult() != null) {
             appendLine(getString(R.string.chat_action_prefix), result.getExecutionResult().getMessage());
         }
+        if (ttsEngine != null && !TextUtils.isEmpty(result.getFinalFeedback())) {
+            ttsEngine.speak(result.getFinalFeedback());
+        }
         scrollTranscriptToBottom();
     }
 
     private TracerBulletResult runTracerBullet(String command, PruningOutcome pruningOutcome) {
         CoDriveAccessibilityService service = CoDriveAccessibilityService.getInstance();
         if (service == null) {
+            Log.w(TAG, "Accessibility service instance is null; verify it is enabled in system settings.");
             return new TracerBulletResult(
                     getString(R.string.chat_service_not_connected),
                     new AgentDecision(ActionType.FINISH, -1, "", "", "", 0.0),
@@ -436,7 +518,8 @@ public class OverlayBubbleService extends Service {
         ChatTracerBulletOrchestrator orchestratorLocal = new ChatTracerBulletOrchestrator(
                 decisionRunner,
                 actionExecutor,
-                runtimeAdapter::bindRegistry
+                runtimeAdapter::bindRegistry,
+                vlmRuntime
         );
 
         TracerBulletResult result;
@@ -553,6 +636,9 @@ public class OverlayBubbleService extends Service {
         if (sendButton != null) {
             sendButton.setEnabled(true);
         }
+        if (ttsEngine != null) {
+            ttsEngine.stop();
+        }
         if (!TextUtils.isEmpty(optionalStatusMessage)) {
             appendLine(getString(R.string.chat_codrive_prefix), optionalStatusMessage);
             scrollTranscriptToBottom();
@@ -611,6 +697,8 @@ public class OverlayBubbleService extends Service {
         }
     }
 }
+
+
 
 
 

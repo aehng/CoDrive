@@ -39,8 +39,17 @@ import com.codrive.ai.orchestration.Tier1NavigationDirective;
 import com.codrive.ai.orchestration.Tier1NavigationRouter;
 import com.codrive.ai.orchestration.TracerBulletResult;
 import com.codrive.ai.settings.LlmSettingsStore;
+import com.codrive.ai.settings.VoiceSettingsStore;
 import com.codrive.ai.service.CoDriveAccessibilityService;
+import com.codrive.ai.contracts.TtsEngine;
+import com.codrive.ai.voice.AndroidTextToSpeechEngine;
+import com.codrive.ai.voice.SherpaTtsEngine;
+import com.codrive.ai.voice.VoiceEngineFactory;
+import com.codrive.ai.modeldownload.ModelStorage;
+import com.codrive.ai.vlm.InternVlModelLoader;
+import com.codrive.ai.vlm.InternVlRuntime;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
@@ -54,9 +63,12 @@ public class ChatActivity extends AppCompatActivity {
     private IdentityDatabase identityDatabase;
     private ExecutorService backgroundExecutor;
     private LlmSettingsStore llmSettingsStore;
+    private VoiceSettingsStore voiceSettingsStore;
     private ActiveSessionManager activeSessionManager;
     private IncrementalRequestManager incrementalRequestManager;
     private UiTreePruner uiTreePruner;
+    private TtsEngine ttsEngine;
+    private InternVlRuntime vlmRuntime;
 
     private static final String TAG = "ChatActivity";
 
@@ -84,10 +96,14 @@ public class ChatActivity extends AppCompatActivity {
                 "codrive_identity.db"
         ).build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
+        voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager();
         backgroundExecutor = Executors.newSingleThreadExecutor();
         incrementalRequestManager = new IncrementalRequestManager(backgroundExecutor);
         uiTreePruner = new UiTreePruner();
+        ModelStorage storage = new ModelStorage(new File(getApplicationContext().getNoBackupFilesDir(), "models"));
+        vlmRuntime = new InternVlRuntime(new InternVlModelLoader(storage));
+        ttsEngine = VoiceEngineFactory.createTtsEngine(this, voiceSettingsStore);
 
         incrementalRequestManager.registerCallback(result -> runOnUiThread(() -> {
             sendButton.setEnabled(true);
@@ -104,6 +120,12 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        refreshTtsEngine();
+    }
+
+    @Override
     protected void onDestroy() {
         if (backgroundExecutor != null) {
             backgroundExecutor.shutdownNow();
@@ -111,13 +133,43 @@ public class ChatActivity extends AppCompatActivity {
         if (incrementalRequestManager != null) {
             incrementalRequestManager.endSession();
         }
+        releaseTtsEngine();
         if (identityDatabase != null) {
             identityDatabase.close();
         }
         super.onDestroy();
     }
 
+    private void refreshTtsEngine() {
+        boolean shouldUseSherpa = VoiceEngineFactory.shouldUseSherpaTts(this, voiceSettingsStore);
+        if (ttsEngine == null) {
+            ttsEngine = VoiceEngineFactory.createTtsEngine(this, voiceSettingsStore);
+            return;
+        }
+        boolean isSherpa = ttsEngine instanceof SherpaTtsEngine;
+        if (isSherpa != shouldUseSherpa) {
+            releaseTtsEngine();
+            ttsEngine = VoiceEngineFactory.createTtsEngine(this, voiceSettingsStore);
+        }
+    }
+
+    private void releaseTtsEngine() {
+        if (ttsEngine == null) {
+            return;
+        }
+        ttsEngine.stop();
+        if (ttsEngine instanceof AndroidTextToSpeechEngine) {
+            ((AndroidTextToSpeechEngine) ttsEngine).shutdown();
+        } else if (ttsEngine instanceof SherpaTtsEngine) {
+            ((SherpaTtsEngine) ttsEngine).shutdown();
+        }
+        ttsEngine = null;
+    }
+
     private void submitCommand() {
+        if (ttsEngine != null) {
+            ttsEngine.stop();
+        }
         final String command = inputText.getText().toString().trim();
         if (TextUtils.isEmpty(command)) {
             Toast.makeText(this, R.string.chat_enter_command_first, Toast.LENGTH_SHORT).show();
@@ -138,6 +190,9 @@ public class ChatActivity extends AppCompatActivity {
         if (result.getExecutionResult() != null) {
             String actionSummary = result.getExecutionResult().getMessage();
             appendLine(getString(R.string.chat_action_prefix), actionSummary);
+        }
+        if (ttsEngine != null && !TextUtils.isEmpty(result.getFinalFeedback())) {
+            ttsEngine.speak(result.getFinalFeedback());
         }
         scrollTranscriptToBottom();
     }
@@ -271,7 +326,8 @@ public class ChatActivity extends AppCompatActivity {
         ChatTracerBulletOrchestrator orchestrator = new ChatTracerBulletOrchestrator(
                 decisionRunner,
                 actionExecutor,
-                runtimeAdapter::bindRegistry
+                runtimeAdapter::bindRegistry,
+                vlmRuntime
         );
 
         TracerBulletResult result = orchestrator.run(
