@@ -76,6 +76,7 @@
     <string name="overlay_listening_muted">Mic muted. Hold to Talk to issue a command.</string>
     <string name="overlay_listening_push_to_talk_active">Listening (push-to-talk)...</string>
     <string name="overlay_listening_push_to_talk_idle">Mic muted. Release complete.</string>
+    <string name="overlay_live_transcript_format">Live: %1$s</string>
     <string name="main_mic_permission_required">Allow microphone access so CoDrive can listen continuously.</string>
     <string name="settings_model_list_label">Available models</string>
     <string name="settings_load_models_button">Load Models</string>

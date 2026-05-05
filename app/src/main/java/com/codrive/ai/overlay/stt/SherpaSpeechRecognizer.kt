@@ -26,6 +26,7 @@ class SherpaSpeechRecognizer(
             if (!running) {
                 return@startListening
             }
+            callbacks.onPartialTranscript(transcript)
             val verdict = endpointer.evaluate(transcript, null)
             if (verdict.shouldSubmit) {
                 callbacks.onCommandReady(verdict.command)
@@ -41,4 +42,3 @@ class SherpaSpeechRecognizer(
         engine.stopListening()
     }
 }
-

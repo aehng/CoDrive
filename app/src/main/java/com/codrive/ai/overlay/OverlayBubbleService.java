@@ -79,6 +79,7 @@ public class OverlayBubbleService extends Service {
     private ScrollView transcriptScroll;
     private TextView transcriptText;
     private TextView listeningStatusText;
+    private TextView liveTranscriptText;
     private EditText inputText;
     private Button sendButton;
     private ToggleButton micToggleButton;
@@ -155,12 +156,18 @@ public class OverlayBubbleService extends Service {
                     public void onCommandReady(String command) {
                         // Final result ready: cancel any pending auto-submit checks
                         mainHandler.removeCallbacks(autoSubmitRunnable);
-                        mainHandler.post(() -> submitOverlayCommand(command, true));
+                        mainHandler.post(() -> {
+                            clearLiveTranscript();
+                            submitOverlayCommand(command, true);
+                        });
                     }
 
                     @Override
                     public void onPartialTranscript(String partial) {
                         mainHandler.post(() -> {
+                            if (partial != null) {
+                                updateLiveTranscript(partial);
+                            }
                             if (inputText != null && partial != null) {
                                 inputText.setText(partial);
                                 // Reset auto-submit timer whenever a partial updates
@@ -175,6 +182,7 @@ public class OverlayBubbleService extends Service {
                         mainHandler.post(() -> {
                             // Cancel auto-submit when explicit rejection occurs
                             mainHandler.removeCallbacks(autoSubmitRunnable);
+                            clearLiveTranscript();
                             updateListeningStatus(getString(R.string.overlay_ignored_noise));
                             if (!"empty transcript".equals(reason)) {
                                 appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.overlay_ignored_noise));
@@ -326,6 +334,7 @@ public class OverlayBubbleService extends Service {
         transcriptScroll = overlayRoot.findViewById(R.id.overlayTranscriptScroll);
         transcriptText = overlayRoot.findViewById(R.id.overlayTranscriptText);
         listeningStatusText = overlayRoot.findViewById(R.id.overlayListeningStatusText);
+        liveTranscriptText = overlayRoot.findViewById(R.id.overlayLiveTranscriptText);
         inputText = overlayRoot.findViewById(R.id.overlayInputText);
         sendButton = overlayRoot.findViewById(R.id.overlaySendButton);
         micToggleButton = overlayRoot.findViewById(R.id.overlayMicToggleButton);
@@ -421,6 +430,7 @@ public class OverlayBubbleService extends Service {
             return;
         }
 
+        clearLiveTranscript();
         if (ttsEngine != null) {
             ttsEngine.stop();
         }
@@ -620,6 +630,7 @@ public class OverlayBubbleService extends Service {
         if (continuousSpeechRecognizer != null) {
             continuousSpeechRecognizer.stop();
         }
+        clearLiveTranscript();
         updateListeningStatus(statusMessage);
     }
 
@@ -627,6 +638,24 @@ public class OverlayBubbleService extends Service {
         if (listeningStatusText != null) {
             listeningStatusText.setText(message);
         }
+    }
+
+    private void updateLiveTranscript(String partial) {
+        if (liveTranscriptText == null) {
+            return;
+        }
+        String trimmed = partial == null ? "" : partial.trim();
+        if (trimmed.isEmpty()) {
+            liveTranscriptText.setText("");
+            liveTranscriptText.setVisibility(View.GONE);
+        } else {
+            liveTranscriptText.setText(getString(R.string.overlay_live_transcript_format, trimmed));
+            liveTranscriptText.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void clearLiveTranscript() {
+        updateLiveTranscript("");
     }
 
     private void interruptActiveCommand(String optionalStatusMessage) {
@@ -689,6 +718,7 @@ public class OverlayBubbleService extends Service {
             transcriptScroll = null;
             transcriptText = null;
             listeningStatusText = null;
+            liveTranscriptText = null;
             inputText = null;
             sendButton = null;
             micToggleButton = null;
