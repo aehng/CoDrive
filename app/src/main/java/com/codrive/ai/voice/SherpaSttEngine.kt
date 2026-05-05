@@ -101,7 +101,7 @@ class SherpaSttEngine(
             blankPenalty = 0.0f
         }
 
-        return OfflineRecognizer(context.assets, config)
+        return OfflineRecognizer(assetManager = null, config = config)
     }
 
     private fun captureAudio(): FloatArray {
