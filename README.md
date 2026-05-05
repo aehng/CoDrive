@@ -39,3 +39,9 @@ CoDrive is an Android 13+ accessibility proxy for overlay chat and future voice-
 - Accessibility scrape root prefers non-CoDrive windows so overlay/chat UI is excluded from automation context
 - Overlay now includes draft always-listening STT with pause-based auto-submit and best-effort interruption of in-flight requests
 
+## Model bootstrap
+- Launch the in-app Model Bootstrap screen from the home page to download and verify offline models.
+- Models are stored under `noBackupFilesDir/models` with subfolders for `vlm`, `stt`, and `tts`.
+- Sherpa voice toggle is only enabled after all required models are verified.
+- Downloads use WorkManager with Wi-Fi/charging constraints from the bootstrap UI.
+

@@ -34,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private Button openLlmSettingsButton;
     private Button startChatButton;
     private Button startOverlayButton;
+    private Button startModelBootstrapButton;
     private LlmSettingsStore llmSettingsStore;
     private boolean pendingOverlayStart;
 
@@ -57,6 +58,9 @@ public class MainActivity extends AppCompatActivity {
 
         startOverlayButton = findViewById(R.id.startOverlayButton);
         startOverlayButton.setOnClickListener(v -> startOverlayBubble());
+
+        startModelBootstrapButton = findViewById(R.id.startModelBootstrapButton);
+        startModelBootstrapButton.setOnClickListener(v -> openModelBootstrap());
 
         ImageButton menuButton = findViewById(R.id.mainMenuButton);
         menuButton.setOnClickListener(this::showNavigationMenu);
@@ -92,6 +96,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void openChat() {
         startActivity(ChatLauncherEntryPoint.newChatIntent(this));
+    }
+
+    private void openModelBootstrap() {
+        Intent intent = new Intent(this, com.codrive.ai.bootstrap.ModelBootstrapActivity.class);
+        startActivity(intent);
     }
 
     private void startOverlayBubble() {

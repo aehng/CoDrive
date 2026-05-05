@@ -107,6 +107,65 @@
                 android:hint="@string/settings_model_hint"
                 android:inputType="text" />
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/settings_voice_section_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_stt_locale_label" />
+
+            <EditText
+                android:id="@+id/settingsSttLocaleInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/settings_stt_locale_hint"
+                android:inputType="text" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_tts_locale_label" />
+
+            <EditText
+                android:id="@+id/settingsTtsLocaleInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/settings_tts_locale_hint"
+                android:inputType="text" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_tts_rate_label" />
+
+            <EditText
+                android:id="@+id/settingsTtsRateInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/settings_tts_rate_hint"
+                android:inputType="numberDecimal" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_tts_pitch_label" />
+
+            <EditText
+                android:id="@+id/settingsTtsPitchInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/settings_tts_pitch_hint"
+                android:inputType="numberDecimal" />
+
             <Button
                 android:id="@+id/settingsSaveButton"
                 android:layout_width="match_parent"

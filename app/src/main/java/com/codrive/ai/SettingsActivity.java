@@ -24,6 +24,7 @@ import com.codrive.ai.llm.LlmModelInfo;
 import com.codrive.ai.llm.LlmModelListResult;
 import com.codrive.ai.settings.LlmProvider;
 import com.codrive.ai.settings.LlmSettingsStore;
+import com.codrive.ai.settings.VoiceSettingsStore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +36,12 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText apiKeyInput;
     private TextView keyPreview;
     private TextView statusText;
+    private EditText sttLocaleInput;
+    private EditText ttsLocaleInput;
+    private EditText ttsRateInput;
+    private EditText ttsPitchInput;
     private LlmSettingsStore settingsStore;
+    private VoiceSettingsStore voiceSettingsStore;
     private ArrayAdapter<String> modelAdapter;
     private final List<LlmModelInfo> availableModels = new ArrayList<>();
     private LlmModelCatalog modelCatalog;
@@ -56,6 +62,10 @@ public class SettingsActivity extends AppCompatActivity {
         keyPreview = findViewById(R.id.settingsKeyPreview);
         statusText = findViewById(R.id.settingsStatusText);
         modelSpinner = findViewById(R.id.settingsModelSpinner);
+        sttLocaleInput = findViewById(R.id.settingsSttLocaleInput);
+        ttsLocaleInput = findViewById(R.id.settingsTtsLocaleInput);
+        ttsRateInput = findViewById(R.id.settingsTtsRateInput);
+        ttsPitchInput = findViewById(R.id.settingsTtsPitchInput);
         Button loadModelsButton = findViewById(R.id.settingsLoadModelsButton);
         Button saveButton = findViewById(R.id.settingsSaveButton);
         ImageButton menuButton = findViewById(R.id.settingsMenuButton);
@@ -88,6 +98,7 @@ public class SettingsActivity extends AppCompatActivity {
         menuButton.setOnClickListener(this::showNavigationMenu);
 
         settingsStore = LlmSettingsStore.create(getApplicationContext());
+        voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
 
         String[] providerLabels = new String[LlmProvider.values().length];
         for (int i = 0; i < LlmProvider.values().length; i++) {
@@ -134,12 +145,24 @@ public class SettingsActivity extends AppCompatActivity {
         keyPreview.setText(getString(R.string.settings_key_preview_format, settingsStore.getMaskedApiKeyFor(provider)));
         statusText.setText(R.string.settings_status_idle);
         clearModelList();
+
+        sttLocaleInput.setText(voiceSettingsStore.getSttLocaleTag());
+        ttsLocaleInput.setText(voiceSettingsStore.getTtsLocaleTag());
+        ttsRateInput.setText(String.valueOf(voiceSettingsStore.getTtsRate()));
+        ttsPitchInput.setText(String.valueOf(voiceSettingsStore.getTtsPitch()));
     }
 
     private void saveSettings() {
         LlmProvider provider = LlmProvider.values()[providerSpinner.getSelectedItemPosition()];
         String model = modelInput.getText().toString().trim();
         String enteredKey = apiKeyInput.getText().toString().trim();
+
+        String sttLocale = sttLocaleInput.getText().toString().trim();
+        String ttsLocale = ttsLocaleInput.getText().toString().trim();
+        float ttsRate = parseFloatOrDefault(ttsRateInput.getText().toString(), voiceSettingsStore.getTtsRate());
+        float ttsPitch = parseFloatOrDefault(ttsPitchInput.getText().toString(), voiceSettingsStore.getTtsPitch());
+
+        voiceSettingsStore.saveVoiceSettings(sttLocale, ttsLocale, ttsRate, ttsPitch);
 
         settingsStore.saveProviderAndModel(provider, model);
         if (!TextUtils.isEmpty(enteredKey)) {
@@ -287,6 +310,17 @@ public class SettingsActivity extends AppCompatActivity {
         apiKeyInput.setText("");
         statusText.setText(R.string.settings_status_idle);
         clearModelList();
+    }
+
+    private float parseFloatOrDefault(String value, float fallback) {
+        if (TextUtils.isEmpty(value)) {
+            return fallback;
+        }
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {
