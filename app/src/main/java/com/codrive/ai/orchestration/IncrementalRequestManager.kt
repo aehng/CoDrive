@@ -6,7 +6,9 @@ import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.AgentPolicy
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.BiFunction
 import java.util.function.Consumer
@@ -17,6 +19,7 @@ class IncrementalRequestManager @JvmOverloads constructor(
 ) {
     private val lock = Any()
     private val generationId = AtomicInteger(0)
+    private val delayScheduler = Executors.newSingleThreadScheduledExecutor()
 
     @Volatile
     private var activeSession: IncrementalSession? = null
@@ -34,6 +37,7 @@ class IncrementalRequestManager @JvmOverloads constructor(
     fun startSession(
         initialCommand: String,
         pruningOutcome: PruningOutcome,
+        delayMs: Long,
         runner: BiFunction<String, PruningOutcome, TracerBulletResult>,
     ) {
         val normalized = normalize(initialCommand) ?: return
@@ -49,12 +53,13 @@ class IncrementalRequestManager @JvmOverloads constructor(
                 activeSession = it
             }
         }
-        launchSession(session, runner)
+        launchSession(session, delayMs, runner)
     }
 
     fun appendToActiveRequest(
         additionalText: String,
         latestPruningOutcome: PruningOutcome?,
+        delayMs: Long,
         runner: BiFunction<String, PruningOutcome, TracerBulletResult>,
     ) {
         val normalized = normalize(additionalText) ?: return
@@ -78,7 +83,7 @@ class IncrementalRequestManager @JvmOverloads constructor(
                 activeSession = it
             }
         }
-        launchSession(session, runner)
+        launchSession(session, delayMs, runner)
     }
 
     fun cancelActiveRequest() {
@@ -102,38 +107,51 @@ class IncrementalRequestManager @JvmOverloads constructor(
 
     private fun launchSession(
         session: IncrementalSession,
+        delayMs: Long,
         runner: BiFunction<String, PruningOutcome, TracerBulletResult>,
     ) {
-        val future = executor.submit {
-            val result = runCatching { runner.apply(session.prompt, session.pruningOutcome) }
-                .recoverCatching { error ->
-                    if (error is CancellationException || error is InterruptedException) {
-                        throw error
-                    }
-                    fallbackFailureResult(error)
-                }
-                .getOrElse { return@submit }
+        val scheduledTask = delayScheduler.schedule({
+            if (session.generation != generationId.get()) return@schedule
 
-            if (session.generation != generationId.get()) {
-                return@submit
+            val future = executor.submit {
+                val result = runCatching { runner.apply(session.prompt, session.pruningOutcome) }
+                    .recoverCatching { error ->
+                        if (error is CancellationException || error is InterruptedException) {
+                            throw error
+                        }
+                        fallbackFailureResult(error)
+                    }
+                    .getOrElse { return@submit }
+
+                if (session.generation != generationId.get()) {
+                    return@submit
+                }
+
+                callback?.accept(result)
+
+                if (result.didExecute || result.decision.actionType == ActionType.FINISH) {
+                    synchronized(lock) {
+                        if (activeSession?.generation == session.generation) {
+                            activeSession = null
+                        }
+                    }
+                }
             }
 
-            callback?.accept(result)
-
-            if (result.didExecute || result.decision.actionType == ActionType.FINISH) {
-                synchronized(lock) {
-                    if (activeSession?.generation == session.generation) {
-                        activeSession = null
-                    }
+            synchronized(lock) {
+                if (activeSession?.generation == session.generation) {
+                    activeFuture = future
+                } else {
+                    future.cancel(true)
                 }
             }
-        }
+        }, delayMs, TimeUnit.MILLISECONDS)
 
         synchronized(lock) {
             if (activeSession?.generation == session.generation) {
-                activeFuture = future
+                activeFuture = scheduledTask
             } else {
-                future.cancel(true)
+                scheduledTask.cancel(true)
             }
         }
     }

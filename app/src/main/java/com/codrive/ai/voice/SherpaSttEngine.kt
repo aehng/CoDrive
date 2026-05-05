@@ -27,6 +27,10 @@ class SherpaSttEngine(
     private var recognizer: OfflineRecognizer? = null
 
     override fun startListening(onTranscript: (String) -> Unit) {
+        startListening(null, onTranscript)
+    }
+
+    fun startListening(onProcessing: (() -> Unit)? = null, onTranscript: (String) -> Unit) {
         if (!running.compareAndSet(false, true)) {
             return
         }
@@ -34,6 +38,10 @@ class SherpaSttEngine(
             try {
                 val engine = recognizer ?: createRecognizer().also { recognizer = it }
                 val audio = captureAudio()
+                
+                // Immediately tell UI that we are done listening and are now thinking
+                onProcessing?.invoke() 
+
                 val stream = engine.createStream()
                 stream.acceptWaveform(audio, SAMPLE_RATE)
                 engine.decode(stream)
@@ -170,8 +178,8 @@ class SherpaSttEngine(
     companion object {
         private const val TAG = "SherpaSttEngine"
         private const val SAMPLE_RATE = 16000
-        private const val SPEECH_THRESHOLD = 800
-        private const val SILENCE_END_MS = 800L
+        private const val SPEECH_THRESHOLD = 600
+        private const val SILENCE_END_MS = 500L
         private const val MAX_SECONDS = 12
         private const val MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS
     }

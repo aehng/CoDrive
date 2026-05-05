@@ -146,12 +146,18 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_tts_rate_label" />
 
-            <EditText
-                android:id="@+id/settingsTtsRateInput"
+            <SeekBar
+                android:id="@+id/settingsTtsRateSeekBar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/settings_tts_rate_hint"
-                android:inputType="numberDecimal" />
+                android:max="60" />
+
+            <TextView
+                android:id="@+id/settingsTtsRateValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="1.00" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -165,6 +171,39 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/settings_tts_pitch_hint"
                 android:inputType="numberDecimal" />
+
+            <CheckBox
+                android:id="@+id/settingsSherpaEnabled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Use Sherpa Offline Voice Engines" />
+
+            <Button
+                android:id="@+id/settingsTestVoiceButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_test_voice_button" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Command Debounce Delay (ms)" />
+
+            <SeekBar
+                android:id="@+id/settingsCommandDelaySeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="4500" />
+
+            <TextView
+                android:id="@+id/settingsCommandDelayValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="1500 ms" />
 
             <Button
                 android:id="@+id/settingsSaveButton"

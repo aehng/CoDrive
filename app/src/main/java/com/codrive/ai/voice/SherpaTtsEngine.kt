@@ -79,11 +79,14 @@ class SherpaTtsEngine(
             ModelArchiveExtractor.extractTarBz2(espeakArchive, espeakDir)
         }
 
+        // FIX A: Handle the nested folder created by the tarball
+        val espeakActualDir = File(espeakDir, "espeak-ng-data").takeIf { it.exists() } ?: espeakDir
+
         val vitsConfig = OfflineTtsVitsModelConfig().apply {
             model = modelFile.absolutePath
             lexicon = ""
             tokens = tokensFile.absolutePath
-            dataDir = espeakDir.absolutePath
+            dataDir = espeakActualDir.absolutePath
             dictDir = ""
             noiseScale = 0.667f
             noiseScaleW = 0.8f
@@ -105,7 +108,7 @@ class SherpaTtsEngine(
             silenceScale = 0.2f
         }
 
-        return OfflineTts(context.assets, ttsConfig)
+        return OfflineTts(null, ttsConfig)
     }
 
     private fun playAudio(audio: GeneratedAudio) {

@@ -10,10 +10,12 @@ public final class VoiceSettingsStore {
     private static final String KEY_TTS_RATE = "voice_tts_rate";
     private static final String KEY_TTS_PITCH = "voice_tts_pitch";
     private static final String KEY_VOICE_ENGINE = "voice_engine";
+    private static final String KEY_COMMAND_DELAY = "voice_command_delay";
 
     private static final String DEFAULT_LOCALE = "en-US";
     private static final float DEFAULT_RATE = 1.0f;
     private static final float DEFAULT_PITCH = 1.0f;
+    private static final long DEFAULT_COMMAND_DELAY = 1500L;
     private static final String ENGINE_NATIVE = "native";
     private static final String ENGINE_SHERPA = "sherpa";
 
@@ -53,13 +55,22 @@ public final class VoiceSettingsStore {
     }
 
     public boolean isSherpaEnabled() {
-        return ENGINE_SHERPA.equals(prefs.getString(KEY_VOICE_ENGINE, ENGINE_NATIVE));
+        return ENGINE_SHERPA.equals(prefs.getString(KEY_VOICE_ENGINE, ENGINE_SHERPA));
     }
 
     public void setSherpaEnabled(boolean enabled) {
         prefs.edit()
             .putString(KEY_VOICE_ENGINE, enabled ? ENGINE_SHERPA : ENGINE_NATIVE)
             .apply();
+    }
+
+    public long getCommandDelayMs() {
+        return prefs.getLong(KEY_COMMAND_DELAY, DEFAULT_COMMAND_DELAY);
+    }
+
+    public void setCommandDelayMs(long delayMs) {
+        long clamped = Math.max(500L, Math.min(5000L, delayMs));
+        prefs.edit().putLong(KEY_COMMAND_DELAY, clamped).apply();
     }
 
     private static String sanitizeLocaleTag(String tag) {

@@ -146,18 +146,16 @@ public class OverlayBubbleService extends Service {
 
                     @Override
                     public void onSpeechDetected() {
-                        // Previously we interrupted the active request as soon as speech was detected.
-                        // That caused frequent "Interrupting current request" messages for brief noises
-                        // or when the user simply started speaking. Instead, only update UI state here.
+                        interruptActiveRequest(null);
                         mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_listening_speech_detected)));
                     }
 
                     @Override
                     public void onCommandReady(String command) {
-                        // Final result ready: cancel any pending auto-submit checks
                         mainHandler.removeCallbacks(autoSubmitRunnable);
                         mainHandler.post(() -> {
                             clearLiveTranscript();
+                            updateListeningStatus("Waiting...");
                             submitOverlayCommand(command, true);
                         });
                     }
@@ -450,10 +448,11 @@ public class OverlayBubbleService extends Service {
 
         PruningOutcome pruningOutcome = capturePruningOutcome();
         BiFunction<String, PruningOutcome, TracerBulletResult> runner = this::runTracerBullet;
+        long delayMs = voiceSettingsStore.getCommandDelayMs();
         if (fromVoice) {
-            incrementalRequestManager.appendToActiveRequest(command, pruningOutcome, runner);
+            incrementalRequestManager.appendToActiveRequest(command, pruningOutcome, delayMs, runner);
         } else {
-            incrementalRequestManager.startSession(command, pruningOutcome, runner);
+            incrementalRequestManager.startSession(command, pruningOutcome, 0, runner);
         }
     }
 
@@ -521,8 +520,16 @@ public class OverlayBubbleService extends Service {
         // OkHttp calls (or other cancellable transports) are aborted promptly.
         final com.codrive.ai.contracts.LlmClient llmClientRef = LlmClientFactory.create(llmSettingsStore);
         InferenceLoopRunner loopRunner = new InferenceLoopRunner(
-                llmClientRef,
-                memorySearchTool
+                LlmClientFactory.create(llmSettingsStore),
+                memorySearchTool,
+                3,
+                query -> {
+                    mainHandler.post(() -> {
+                        appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.overlay_searching_memory));
+                        updateListeningStatus(getString(R.string.overlay_searching_memory));
+                        scrollTranscriptToBottom();
+                    });
+                }
         );
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;
         ChatTracerBulletOrchestrator orchestratorLocal = new ChatTracerBulletOrchestrator(
@@ -658,7 +665,7 @@ public class OverlayBubbleService extends Service {
         updateLiveTranscript("");
     }
 
-    private void interruptActiveCommand(String optionalStatusMessage) {
+    private void interruptActiveRequest(String optionalStatusMessage) {
         if (incrementalRequestManager != null) {
             incrementalRequestManager.cancelActiveRequest();
         }
@@ -672,6 +679,10 @@ public class OverlayBubbleService extends Service {
             appendLine(getString(R.string.chat_codrive_prefix), optionalStatusMessage);
             scrollTranscriptToBottom();
         }
+    }
+
+    private void interruptActiveCommand(String optionalStatusMessage) {
+        interruptActiveRequest(optionalStatusMessage);
     }
 
     private boolean handlePushToTalkTouch(MotionEvent event) {
@@ -727,6 +738,8 @@ public class OverlayBubbleService extends Service {
         }
     }
 }
+
+
 
 
 

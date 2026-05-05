@@ -22,19 +22,22 @@ class SherpaSpeechRecognizer(
         }
         running = true
         callbacks.onListeningStateChanged("Listening for commands...")
-        engine.startListening { transcript ->
-            if (!running) {
-                return@startListening
+        engine.startListening(
+            onProcessing = { callbacks.onListeningStateChanged("Processing speech...") },
+            onTranscript = { transcript ->
+                if (!running) {
+                    return@startListening
+                }
+                callbacks.onPartialTranscript(transcript)
+                val verdict = endpointer.evaluate(transcript, null)
+                if (verdict.shouldSubmit) {
+                    callbacks.onCommandReady(verdict.command)
+                } else {
+                    callbacks.onCommandRejected(verdict.reason)
+                }
+                callbacks.onListeningStateChanged("Listening for commands...")
             }
-            callbacks.onPartialTranscript(transcript)
-            val verdict = endpointer.evaluate(transcript, null)
-            if (verdict.shouldSubmit) {
-                callbacks.onCommandReady(verdict.command)
-            } else {
-                callbacks.onCommandRejected(verdict.reason)
-            }
-            callbacks.onListeningStateChanged("Listening for commands...")
-        }
+        )
     }
 
     override fun stop() {

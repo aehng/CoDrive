@@ -181,6 +181,7 @@ public class ChatActivity extends AppCompatActivity {
         incrementalRequestManager.startSession(
                 command,
                 capturePruningOutcome(),
+                0,
                 this::runTracerBullet
         );
     }
@@ -319,7 +320,14 @@ public class ChatActivity extends AppCompatActivity {
         );
         InferenceLoopRunner loopRunner = new InferenceLoopRunner(
                 LlmClientFactory.create(llmSettingsStore),
-                memorySearchTool
+                memorySearchTool,
+                3,
+                query -> {
+                    runOnUiThread(() -> {
+                        appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.chat_searching_memory));
+                        scrollTranscriptToBottom();
+                    });
+                }
         );
 
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;

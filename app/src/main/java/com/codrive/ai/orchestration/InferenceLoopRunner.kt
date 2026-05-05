@@ -5,11 +5,13 @@ import com.codrive.ai.memory.MemorySearchTool
 import com.codrive.ai.model.ActionType
 import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.PrunedUiMap
+import java.util.function.Consumer
 
 class InferenceLoopRunner @JvmOverloads constructor(
     private val llmClient: LlmClient,
     private val memorySearchTool: MemorySearchTool,
     private val maxTurns: Int = 3,
+    private val onMemorySearch: Consumer<String>? = null,
 ) {
     fun run(initialCommand: String, uiMap: PrunedUiMap): AgentDecision {
         var prompt = initialCommand
@@ -57,6 +59,8 @@ class InferenceLoopRunner @JvmOverloads constructor(
                 return resolvedNonNull
             }
 
+            onMemorySearch?.accept(resolvedNonNull.toolQuery)
+
             val memoryResult = try {
                 memorySearchTool.search(resolvedNonNull.toolQuery)
             } catch (e: Exception) {
@@ -88,4 +92,3 @@ class InferenceLoopRunner @JvmOverloads constructor(
         )
     }
 }
-

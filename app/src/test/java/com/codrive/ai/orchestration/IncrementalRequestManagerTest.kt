@@ -48,8 +48,8 @@ class IncrementalRequestManagerTest {
                 )
             }
 
-            manager.startSession("open quick settings", pruningOutcome(11L), runner)
-            manager.appendToActiveRequest("and then go home", pruningOutcome(22L), runner)
+            manager.startSession("open quick settings", pruningOutcome(11L), 0L, runner)
+            manager.appendToActiveRequest("and then go home", pruningOutcome(22L), 0L, runner)
 
             assertTrue("Expected callback from latest generation", latch.await(2, TimeUnit.SECONDS))
             assertTrue(prompts.any { it.contains("CONTINUATION: and then go home") })
@@ -95,8 +95,8 @@ class IncrementalRequestManagerTest {
                 )
             }
 
-            manager.startSession("first command", pruningOutcome(1L), runner)
-            manager.appendToActiveRequest("override", pruningOutcome(2L), runner)
+            manager.startSession("first command", pruningOutcome(1L), 0L, runner)
+            manager.appendToActiveRequest("override", pruningOutcome(2L), 0L, runner)
 
             assertTrue("Expected callback from current generation", latch.await(3, TimeUnit.SECONDS))
             assertEquals(1, callbackCount.get())

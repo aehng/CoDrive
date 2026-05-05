@@ -94,4 +94,11 @@
     <string name="settings_tts_rate_hint">1.0</string>
     <string name="settings_tts_pitch_label">TTS pitch (0.7 - 1.3)</string>
     <string name="settings_tts_pitch_hint">1.0</string>
+    <string name="settings_test_voice_button">Test Voice Output</string>
+    <string name="settings_voice_test_sample">Sherpa voice test. If you can hear this, the engine is working.</string>
+    <string name="settings_voice_test_missing_models">Sherpa models missing. Download voice models to test.</string>
+    <string name="settings_voice_test_sherpa">Testing Sherpa voice...</string>
+    <string name="settings_voice_test_native">Testing Android voice...</string>
+    <string name="chat_searching_memory">Searching memory...</string>
+    <string name="overlay_searching_memory">Searching memory...</string>
 </resources>

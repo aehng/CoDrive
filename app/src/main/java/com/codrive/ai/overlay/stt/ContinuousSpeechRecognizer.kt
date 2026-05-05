@@ -149,9 +149,9 @@ class ContinuousSpeechRecognizer(
                     callbacks.onCommandReady(verdict.command)
                 } else {
                     callbacks.onCommandRejected(verdict.reason)
+                    callbacks.onListeningStateChanged("Listening for commands...")
+                    startListeningSoon(120L)
                 }
-                callbacks.onListeningStateChanged("Listening for commands...")
-                startListeningSoon(120L)
             }
 
             override fun onPartialResults(partialResults: Bundle?) {

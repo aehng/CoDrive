@@ -8,9 +8,11 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -19,15 +21,22 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.codrive.ai.contracts.TtsEngine;
 import com.codrive.ai.llm.LlmModelCatalog;
 import com.codrive.ai.llm.LlmModelInfo;
 import com.codrive.ai.llm.LlmModelListResult;
+import com.codrive.ai.modeldownload.ModelReadiness;
+import com.codrive.ai.modeldownload.ModelStorage;
 import com.codrive.ai.settings.LlmProvider;
 import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.settings.VoiceSettingsStore;
+import com.codrive.ai.voice.AndroidTextToSpeechEngine;
+import com.codrive.ai.voice.SherpaTtsEngine;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class SettingsActivity extends AppCompatActivity {
     private Spinner providerSpinner;
@@ -38,14 +47,22 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView statusText;
     private EditText sttLocaleInput;
     private EditText ttsLocaleInput;
-    private EditText ttsRateInput;
+    private SeekBar ttsRateSeekBar;
+    private TextView ttsRateValueText;
     private EditText ttsPitchInput;
+    private CheckBox sherpaEnabledCheckbox;
+    private SeekBar commandDelaySeekBar;
+    private TextView commandDelayValueText;
+    private TtsEngine testTtsEngine;
     private LlmSettingsStore settingsStore;
     private VoiceSettingsStore voiceSettingsStore;
     private ArrayAdapter<String> modelAdapter;
     private final List<LlmModelInfo> availableModels = new ArrayList<>();
     private LlmModelCatalog modelCatalog;
     private static final String DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+    private static final float TTS_RATE_MIN = 0.7f;
+    private static final float TTS_RATE_MAX = 1.3f;
+    private static final float TTS_RATE_STEP = 0.01f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,10 +81,15 @@ public class SettingsActivity extends AppCompatActivity {
         modelSpinner = findViewById(R.id.settingsModelSpinner);
         sttLocaleInput = findViewById(R.id.settingsSttLocaleInput);
         ttsLocaleInput = findViewById(R.id.settingsTtsLocaleInput);
-        ttsRateInput = findViewById(R.id.settingsTtsRateInput);
+        ttsRateSeekBar = findViewById(R.id.settingsTtsRateSeekBar);
+        ttsRateValueText = findViewById(R.id.settingsTtsRateValue);
         ttsPitchInput = findViewById(R.id.settingsTtsPitchInput);
+        sherpaEnabledCheckbox = findViewById(R.id.settingsSherpaEnabled);
+        commandDelaySeekBar = findViewById(R.id.settingsCommandDelaySeekBar);
+        commandDelayValueText = findViewById(R.id.settingsCommandDelayValue);
         Button loadModelsButton = findViewById(R.id.settingsLoadModelsButton);
         Button saveButton = findViewById(R.id.settingsSaveButton);
+        Button testVoiceButton = findViewById(R.id.settingsTestVoiceButton);
         ImageButton menuButton = findViewById(R.id.settingsMenuButton);
 
         modelCatalog = new LlmModelCatalog();
@@ -131,6 +153,34 @@ public class SettingsActivity extends AppCompatActivity {
 
         saveButton.setOnClickListener(v -> saveSettings());
         loadModelsButton.setOnClickListener(v -> loadModelsForProvider());
+        testVoiceButton.setOnClickListener(v -> testVoiceOutput());
+
+        ttsRateSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                updateTtsRateValue(getTtsRateFromSeekBar());
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        commandDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                long delay = progress + 500L;
+                commandDelayValueText.setText(delay + " ms");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
     }
 
     private void loadCurrentSettings() {
@@ -148,8 +198,14 @@ public class SettingsActivity extends AppCompatActivity {
 
         sttLocaleInput.setText(voiceSettingsStore.getSttLocaleTag());
         ttsLocaleInput.setText(voiceSettingsStore.getTtsLocaleTag());
-        ttsRateInput.setText(String.valueOf(voiceSettingsStore.getTtsRate()));
+        float ttsRate = voiceSettingsStore.getTtsRate();
+        ttsRateSeekBar.setProgress(progressForRate(ttsRate));
+        updateTtsRateValue(ttsRate);
         ttsPitchInput.setText(String.valueOf(voiceSettingsStore.getTtsPitch()));
+        sherpaEnabledCheckbox.setChecked(voiceSettingsStore.isSherpaEnabled());
+        long currentDelay = voiceSettingsStore.getCommandDelayMs();
+        commandDelaySeekBar.setProgress((int) (currentDelay - 500));
+        commandDelayValueText.setText(currentDelay + " ms");
     }
 
     private void saveSettings() {
@@ -159,10 +215,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         String sttLocale = sttLocaleInput.getText().toString().trim();
         String ttsLocale = ttsLocaleInput.getText().toString().trim();
-        float ttsRate = parseFloatOrDefault(ttsRateInput.getText().toString(), voiceSettingsStore.getTtsRate());
+        float ttsRate = getTtsRateFromSeekBar();
         float ttsPitch = parseFloatOrDefault(ttsPitchInput.getText().toString(), voiceSettingsStore.getTtsPitch());
 
         voiceSettingsStore.saveVoiceSettings(sttLocale, ttsLocale, ttsRate, ttsPitch);
+        voiceSettingsStore.setSherpaEnabled(sherpaEnabledCheckbox.isChecked());
+        voiceSettingsStore.setCommandDelayMs(commandDelaySeekBar.getProgress() + 500L);
 
         settingsStore.saveProviderAndModel(provider, model);
         if (!TextUtils.isEmpty(enteredKey)) {
@@ -321,6 +379,56 @@ public class SettingsActivity extends AppCompatActivity {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        releaseTestTtsEngine();
+        super.onDestroy();
+    }
+
+    private void testVoiceOutput() {
+        releaseTestTtsEngine();
+        boolean wantsSherpa = sherpaEnabledCheckbox.isChecked();
+        ModelStorage storage = new ModelStorage(new File(getNoBackupFilesDir(), "models"));
+        if (wantsSherpa && !ModelReadiness.INSTANCE.hasTtsModels(storage)) {
+            statusText.setText(R.string.settings_voice_test_missing_models);
+            return;
+        }
+        if (wantsSherpa) {
+            testTtsEngine = new SherpaTtsEngine(this, storage);
+            statusText.setText(R.string.settings_voice_test_sherpa);
+        } else {
+            testTtsEngine = new AndroidTextToSpeechEngine(this, voiceSettingsStore);
+            statusText.setText(R.string.settings_voice_test_native);
+        }
+        testTtsEngine.speak(getString(R.string.settings_voice_test_sample));
+    }
+
+    private void releaseTestTtsEngine() {
+        if (testTtsEngine == null) {
+            return;
+        }
+        testTtsEngine.stop();
+        if (testTtsEngine instanceof AndroidTextToSpeechEngine) {
+            ((AndroidTextToSpeechEngine) testTtsEngine).shutdown();
+        } else if (testTtsEngine instanceof SherpaTtsEngine) {
+            ((SherpaTtsEngine) testTtsEngine).shutdown();
+        }
+        testTtsEngine = null;
+    }
+
+    private float getTtsRateFromSeekBar() {
+        return TTS_RATE_MIN + (ttsRateSeekBar.getProgress() * TTS_RATE_STEP);
+    }
+
+    private int progressForRate(float rate) {
+        float clamped = Math.max(TTS_RATE_MIN, Math.min(TTS_RATE_MAX, rate));
+        return Math.round((clamped - TTS_RATE_MIN) / TTS_RATE_STEP);
+    }
+
+    private void updateTtsRateValue(float rate) {
+        ttsRateValueText.setText(String.format(Locale.US, "%.2f", rate));
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {
