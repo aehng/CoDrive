@@ -3,6 +3,7 @@ package com.codrive.ai;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -63,6 +64,7 @@ public class SettingsActivity extends AppCompatActivity {
     private static final float TTS_RATE_MIN = 0.7f;
     private static final float TTS_RATE_MAX = 1.3f;
     private static final float TTS_RATE_STEP = 0.01f;
+    private static final String TAG = "SettingsActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -392,6 +394,31 @@ public class SettingsActivity extends AppCompatActivity {
         boolean wantsSherpa = sherpaEnabledCheckbox.isChecked();
         ModelStorage storage = new ModelStorage(new File(getNoBackupFilesDir(), "models"));
         if (wantsSherpa && !ModelReadiness.INSTANCE.hasTtsModels(storage)) {
+            // Log detailed diagnostics about which model files are missing/invalid so we can
+            // inspect via logcat when testing Sherpa voice output.
+            StringBuilder diag = new StringBuilder();
+            diag.append("Sherpa TTS model readiness check failed:\n");
+            try {
+                // Iterate through each required voice asset and print verification status
+                for (com.codrive.ai.models.ModelAsset asset : com.codrive.ai.models.ModelManifest.INSTANCE.getVoiceRequiredModels()) {
+                    java.io.File dest = storage.destinationFile(asset);
+                    boolean exists = dest.exists();
+                    boolean isValid = storage.isValidFile(asset);
+                    boolean isVerified = storage.isVerified(asset);
+                    diag.append(String.format("- %s\n    path=%s\n    exists=%b valid=%b verified=%b\n",
+                            asset.getFileName(), dest.getAbsolutePath(), exists, isValid, isVerified));
+                    // For the espeak archive, also show the extracted dir state
+                    if (asset.equals(com.codrive.ai.models.ModelManifest.INSTANCE.getTTS_ESPEAK_DATA())) {
+                        java.io.File extracted = storage.extractedDir(asset);
+                        diag.append(String.format("    extractedDir=%s exists=%b\n",
+                                extracted.getAbsolutePath(), extracted.exists()));
+                    }
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to evaluate model readiness diagnostics", ex);
+            }
+            // Emit as an error so it stands out in logcat while testing
+            Log.e(TAG, diag.toString());
             statusText.setText(R.string.settings_voice_test_missing_models);
             return;
         }
