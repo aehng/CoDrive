@@ -1,6 +1,7 @@
 package com.codrive.ai.voice
 
 import android.content.Context
+import android.util.Log
 import com.codrive.ai.modeldownload.ModelReadiness
 import com.codrive.ai.modeldownload.ModelStorage
 import com.codrive.ai.overlay.stt.ContinuousSpeechRecognizer
@@ -14,13 +15,21 @@ object VoiceEngineFactory {
     @JvmStatic
     fun shouldUseSherpaTts(context: Context, settings: VoiceSettingsStore): Boolean {
         val storage = ModelStorage(File(context.noBackupFilesDir, "models"))
-        return settings.isSherpaEnabled() && ModelReadiness.hasTtsModels(storage)
+        val enabled = settings.isSherpaEnabled()
+        val ready = ModelReadiness.hasTtsModels(storage)
+        val useSherpa = enabled && ready
+        Log.d(TAG, "TTS engine decision: sherpaEnabled=$enabled ttsModelsReady=$ready useSherpa=$useSherpa")
+        return useSherpa
     }
 
     @JvmStatic
     fun shouldUseSherpaStt(context: Context, settings: VoiceSettingsStore): Boolean {
         val storage = ModelStorage(File(context.noBackupFilesDir, "models"))
-        return settings.isSherpaEnabled() && ModelReadiness.hasSttModels(storage)
+        val enabled = settings.isSherpaEnabled()
+        val ready = ModelReadiness.hasSttModels(storage)
+        val useSherpa = enabled && ready
+        Log.d(TAG, "STT engine decision: sherpaEnabled=$enabled sttModelsReady=$ready useSherpa=$useSherpa")
+        return useSherpa
     }
 
     @JvmStatic
@@ -29,9 +38,16 @@ object VoiceEngineFactory {
         settings: VoiceSettingsStore
     ): com.codrive.ai.contracts.TtsEngine {
         val storage = ModelStorage(File(context.noBackupFilesDir, "models"))
-        return if (shouldUseSherpaTts(context, settings)) {
+        if (!shouldUseSherpaTts(context, settings)) {
+            Log.i(TAG, "Using Android TextToSpeech engine.")
+            return AndroidTextToSpeechEngine(context, settings)
+        }
+
+        return runCatching {
+            Log.i(TAG, "Using Sherpa TTS engine.")
             SherpaTtsEngine(context, storage)
-        } else {
+        }.getOrElse { error ->
+            Log.w(TAG, "Failed to create Sherpa TTS. Falling back to Android TTS.", error)
             AndroidTextToSpeechEngine(context, settings)
         }
     }
@@ -45,11 +61,20 @@ object VoiceEngineFactory {
         settings: VoiceSettingsStore
     ): OverlaySpeechRecognizer {
         val storage = ModelStorage(File(context.noBackupFilesDir, "models"))
-        return if (shouldUseSherpaStt(context, settings)) {
+        if (!shouldUseSherpaStt(context, settings)) {
+            Log.i(TAG, "Using Android SpeechRecognizer engine.")
+            return ContinuousSpeechRecognizer(context, callbacks, endpointer, localeTag)
+        }
+
+        return runCatching {
+            Log.i(TAG, "Using Sherpa STT engine.")
             SherpaSpeechRecognizer(context, callbacks, endpointer, storage)
-        } else {
+        }.getOrElse { error ->
+            Log.w(TAG, "Failed to create Sherpa STT. Falling back to Android SpeechRecognizer.", error)
             ContinuousSpeechRecognizer(context, callbacks, endpointer, localeTag)
         }
     }
+
+    private const val TAG = "VoiceEngineFactory"
 }
 

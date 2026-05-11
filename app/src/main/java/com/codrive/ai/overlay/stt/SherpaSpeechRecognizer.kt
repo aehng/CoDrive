@@ -1,6 +1,8 @@
 package com.codrive.ai.overlay.stt
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.codrive.ai.modeldownload.ModelStorage
 import com.codrive.ai.voice.SherpaSttEngine
 
@@ -10,6 +12,7 @@ class SherpaSpeechRecognizer(
     private val endpointer: SpeechCommandEndpointer = SpeechCommandEndpointer(),
     private val storage: ModelStorage
 ) : OverlaySpeechRecognizer {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val engine = SherpaSttEngine(context, storage) {
         callbacks.onSpeechDetected()
         callbacks.onListeningStateChanged("Speech detected...")
@@ -36,12 +39,16 @@ class SherpaSpeechRecognizer(
                     callbacks.onCommandRejected(verdict.reason)
                 }
                 callbacks.onListeningStateChanged("Listening for commands...")
+                if (running) {
+                    mainHandler.postDelayed({ start() }, 120L)
+                }
             }
         )
     }
 
     override fun stop() {
         running = false
+        mainHandler.removeCallbacksAndMessages(null)
         engine.stopListening()
     }
 }

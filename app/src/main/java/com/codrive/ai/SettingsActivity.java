@@ -2,6 +2,8 @@ package com.codrive.ai;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
@@ -33,6 +35,7 @@ import com.codrive.ai.settings.LlmSettingsStore;
 import com.codrive.ai.settings.VoiceSettingsStore;
 import com.codrive.ai.voice.AndroidTextToSpeechEngine;
 import com.codrive.ai.voice.SherpaTtsEngine;
+import com.codrive.ai.voice.SpeakObserver;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -60,7 +63,10 @@ public class SettingsActivity extends AppCompatActivity {
     private ArrayAdapter<String> modelAdapter;
     private final List<LlmModelInfo> availableModels = new ArrayList<>();
     private LlmModelCatalog modelCatalog;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable voiceTestTimeoutRunnable;
     private static final String DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+    private static final long VOICE_TEST_TIMEOUT_MS = 12_000L;
     private static final float TTS_RATE_MIN = 0.7f;
     private static final float TTS_RATE_MAX = 1.3f;
     private static final float TTS_RATE_STEP = 0.01f;
@@ -390,6 +396,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void testVoiceOutput() {
+        cancelVoiceTestTimeout();
         releaseTestTtsEngine();
         boolean wantsSherpa = sherpaEnabledCheckbox.isChecked();
         ModelStorage storage = new ModelStorage(new File(getNoBackupFilesDir(), "models"));
@@ -423,16 +430,31 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
         if (wantsSherpa) {
-            testTtsEngine = new SherpaTtsEngine(this, storage);
+            testTtsEngine = new SherpaTtsEngine(this, storage, new SpeakObserver() {
+                @Override
+                public void onSpeakFinished(boolean success, String errorMessage) {
+                    runOnUiThread(() -> {
+                        cancelVoiceTestTimeout();
+                        releaseTestTtsEngine();
+                        if (success) {
+                            statusText.setText(R.string.settings_voice_test_complete);
+                        } else {
+                            statusText.setText(getString(R.string.settings_voice_test_failed, errorMessage != null ? errorMessage : "unknown error"));
+                        }
+                    });
+                }
+            });
             statusText.setText(R.string.settings_voice_test_sherpa);
         } else {
             testTtsEngine = new AndroidTextToSpeechEngine(this, voiceSettingsStore);
             statusText.setText(R.string.settings_voice_test_native);
         }
         testTtsEngine.speak(getString(R.string.settings_voice_test_sample));
+        scheduleVoiceTestTimeout();
     }
 
     private void releaseTestTtsEngine() {
+        cancelVoiceTestTimeout();
         if (testTtsEngine == null) {
             return;
         }
@@ -443,6 +465,25 @@ public class SettingsActivity extends AppCompatActivity {
             ((SherpaTtsEngine) testTtsEngine).shutdown();
         }
         testTtsEngine = null;
+    }
+
+    private void scheduleVoiceTestTimeout() {
+        cancelVoiceTestTimeout();
+        voiceTestTimeoutRunnable = () -> {
+            if (testTtsEngine != null) {
+                Log.w(TAG, "Voice test timed out; releasing test engine");
+                releaseTestTtsEngine();
+                statusText.setText(R.string.settings_voice_test_timeout);
+            }
+        };
+        mainHandler.postDelayed(voiceTestTimeoutRunnable, VOICE_TEST_TIMEOUT_MS);
+    }
+
+    private void cancelVoiceTestTimeout() {
+        if (voiceTestTimeoutRunnable != null) {
+            mainHandler.removeCallbacks(voiceTestTimeoutRunnable);
+            voiceTestTimeoutRunnable = null;
+        }
     }
 
     private float getTtsRateFromSeekBar() {

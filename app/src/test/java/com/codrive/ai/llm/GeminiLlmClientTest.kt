@@ -6,6 +6,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -136,6 +137,33 @@ class GeminiLlmClientTest {
         )
 
         assertEquals(true, result.first)
+    }
+
+    @Test
+    fun validateApiKey_recoversFromServerError_usingFallbackCandidateModel() {
+        val serverError = makeResponse(500, "Internal")
+        val successContent = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"action_type\\\":\\\"RESPOND\\\",\\\"voice_feedback\\\":\\\"pong\\\",\\\"confidence_score\\\":0.5}\"}]}}]}"
+        val successResp = makeResponse(200, successContent)
+        val seenModels = mutableListOf<String>()
+
+        val transportFactory: (String, String) -> GeminiTransport = { _, model ->
+            GeminiTransport { _, _ ->
+                seenModels.add(model)
+                if (model == "models/gemini-1.5-flash") FakeCall(successResp) else FakeCall(serverError)
+            }
+        }
+
+        val result = GeminiLlmClient.validateApiKey(
+            "fake-key",
+            "models/gemma-4-31b-it",
+            2000,
+            transportFactory = transportFactory,
+            fallbackFactory = transportFactory
+        )
+
+        assertTrue(result.first)
+        assertTrue(seenModels.contains("models/gemma-4-31b-it"))
+        assertTrue(seenModels.contains("models/gemini-1.5-flash"))
     }
 }
 

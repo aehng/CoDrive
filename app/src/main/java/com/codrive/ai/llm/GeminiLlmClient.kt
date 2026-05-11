@@ -405,11 +405,41 @@ class GeminiLlmClient @JvmOverloads constructor(
                 }
             }
 
+            fun tryValidationModels(tf: (String, String) -> GeminiTransport): Pair<Boolean, String>? {
+                val normalizedPrimary = normalizeModelName(model)
+                val candidates = linkedSetOf(
+                    normalizedPrimary,
+                    "models/gemini-1.5-flash",
+                    "models/gemini-1.5-flash-8b",
+                )
+                for (candidate in candidates) {
+                    try {
+                        val (candidateCode, candidateBody) = tryTransport(tf, candidate)
+                        if (BuildConfig.DEBUG) {
+                            try {
+                                android.util.Log.d(
+                                    "CoDrive.Gemini.Validate",
+                                    "Candidate model=$candidate response code=$candidateCode body=${sanitizeForLogs(candidateBody)}"
+                                )
+                            } catch (_: Exception) { }
+                        }
+                        if (candidateCode in 200..299) {
+                            return Pair(true, "OK ($candidate)")
+                        }
+                        if (candidateCode == 401 || candidateCode == 403) {
+                            return Pair(false, "API key rejected (401/403)")
+                        }
+                    } catch (_: Exception) {
+                        // Keep trying candidate models.
+                    }
+                }
+                return null
+            }
+
             return try {
-                // Primary attempt using provided model string
                 if (BuildConfig.DEBUG) {
                     try {
-                        android.util.Log.d("CoDrive.Gemini.Validate", "Validating Gemini API key (model=$model) — primary attempt using configured transport")
+                        android.util.Log.d("CoDrive.Gemini.Validate", "Validating Gemini API key (model=$model) - primary attempt using configured transport")
                     } catch (_: Exception) { }
                 }
                 val (code, body) = tryTransport(transportFactory, model)
@@ -421,7 +451,6 @@ class GeminiLlmClient @JvmOverloads constructor(
                 when (code) {
                     in 200..299 -> Pair(true, "OK")
                     401, 403 -> {
-                        // Try query-key fallback once before failing validation.
                         if (BuildConfig.DEBUG) {
                             try { android.util.Log.d("CoDrive.Gemini.Validate", "Primary auth rejected (401/403), attempting fallback transport") } catch (_: Exception) { }
                         }
@@ -440,7 +469,6 @@ class GeminiLlmClient @JvmOverloads constructor(
                         }
                     }
                     404 -> {
-                        // Try alternate model formatting (some endpoints expect "models/{id}")
                         val altModel = if (model.startsWith("models/")) model else "models/$model"
                         if (BuildConfig.DEBUG) {
                             try { android.util.Log.d("CoDrive.Gemini.Validate", "Received 404; attempting alt model format: $altModel") } catch (_: Exception) { }
@@ -451,14 +479,13 @@ class GeminiLlmClient @JvmOverloads constructor(
                                 try { android.util.Log.d("CoDrive.Gemini.Validate", "Alt primary response code=$altCode body=${sanitizeForLogs(altBody)}") } catch (_: Exception) { }
                             }
                             if (altCode in 200..299) return Pair(true, "OK (alt-model)")
-                            // try fallback with query-key for the alt model
                             val (altFbCode, altFbBody) = tryTransport(fallbackFactory, altModel)
                             if (BuildConfig.DEBUG) {
                                 try { android.util.Log.d("CoDrive.Gemini.Validate", "Alt fallback response code=$altFbCode body=${sanitizeForLogs(altFbBody)}") } catch (_: Exception) { }
                             }
                             when (altFbCode) {
                                 in 200..299 -> Pair(true, "OK (alt-model query-key)")
-                                401,403 -> Pair(false, "API key rejected (401/403)")
+                                401, 403 -> Pair(false, "API key rejected (401/403)")
                                 404 -> Pair(false, "Model or endpoint not found (404)")
                                 else -> Pair(false, "Unexpected status on alt fallback: $altFbCode")
                             }
@@ -467,7 +494,11 @@ class GeminiLlmClient @JvmOverloads constructor(
                         }
                     }
                     429 -> Pair(false, "Rate limited (429)")
-                    in 500..599 -> Pair(false, "Server error: $code")
+                    in 500..599 -> {
+                        tryValidationModels(transportFactory)
+                            ?: tryValidationModels(fallbackFactory)
+                            ?: Pair(false, "Server error: $code")
+                    }
                     else -> Pair(false, "Unexpected status: $code")
                 }
             } catch (_: Exception) {

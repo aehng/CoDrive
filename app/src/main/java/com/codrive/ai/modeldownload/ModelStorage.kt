@@ -44,6 +44,10 @@ class ModelStorage(private val rootDir: File) {
         if (!destination.exists()) {
             return false
         }
+        // A matching verification marker means we already accepted this exact artifact hash.
+        if (isVerified(asset)) {
+            return true
+        }
         val length = destination.length()
         if (length <= 0L) {
             return false

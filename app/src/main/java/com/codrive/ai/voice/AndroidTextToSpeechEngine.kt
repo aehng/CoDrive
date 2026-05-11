@@ -78,8 +78,7 @@ class AndroidTextToSpeechEngine(
         val activeVoice = engine.voice
         val hasEmbedded = activeVoice?.features?.contains(TextToSpeech.Engine.KEY_FEATURE_EMBEDDED_SYNTHESIS) == true
         if (!hasEmbedded) {
-            Log.w(TAG, "No embedded/offline TTS voice available for $localeTag; skipping speech.")
-            return false
+            Log.w(TAG, "No embedded/offline TTS voice available for $localeTag; using default system TTS voice.")
         }
 
         val audioAttributes = AudioAttributes.Builder()
@@ -100,7 +99,7 @@ class AndroidTextToSpeechEngine(
             }
 
             override fun onError(utteranceId: String?) {
-                // No-op.
+                Log.w(TAG, "TTS utterance error for id=$utteranceId")
             }
         })
 

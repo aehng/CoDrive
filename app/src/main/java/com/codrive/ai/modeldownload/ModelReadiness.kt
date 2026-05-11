@@ -11,9 +11,10 @@ object ModelReadiness {
     }
 
     fun hasTtsModels(storage: ModelStorage): Boolean {
-        val espeakReady = storage.isVerified(ModelManifest.TTS_ESPEAK_DATA) &&
-            storage.isValidFile(ModelManifest.TTS_ESPEAK_DATA) &&
-            storage.extractedDir(ModelManifest.TTS_ESPEAK_DATA).exists()
+        val espeakArchiveReady = storage.isVerified(ModelManifest.TTS_ESPEAK_DATA) &&
+            storage.isValidFile(ModelManifest.TTS_ESPEAK_DATA)
+        val espeakExtractedReady = storage.extractedDir(ModelManifest.TTS_ESPEAK_DATA).exists()
+        val espeakReady = espeakArchiveReady || espeakExtractedReady
         return storage.isVerified(ModelManifest.TTS_MODEL) &&
             storage.isVerified(ModelManifest.TTS_CONFIG) &&
             storage.isVerified(ModelManifest.TTS_TOKENS) &&

@@ -78,4 +78,23 @@ class ModelStorageTest {
 
         assertFalse(storage.isValidFile(asset))
     }
+
+    @Test
+    fun isValidFile_acceptsVerifiedFile_evenWhenSizeMetadataIsTooLarge() {
+        val root = Files.createTempDirectory("model-storage-verified").toFile()
+        val storage = ModelStorage(root)
+        val asset = ModelAsset(
+            fileName = "tts/tokens.txt",
+            downloadUrl = "https://example.com/tokens.txt",
+            sha256 = "goodhash",
+            sizeBytes = 10_000L
+        )
+
+        val destination = storage.destinationFile(asset)
+        destination.parentFile?.mkdirs()
+        destination.writeText("small-but-valid")
+        storage.markVerified(asset, "goodhash")
+
+        assertTrue(storage.isValidFile(asset))
+    }
 }

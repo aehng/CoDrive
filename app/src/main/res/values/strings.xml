@@ -99,6 +99,9 @@
     <string name="settings_voice_test_missing_models">Sherpa models missing. Download voice models to test.</string>
     <string name="settings_voice_test_sherpa">Testing Sherpa voice...</string>
     <string name="settings_voice_test_native">Testing Android voice...</string>
+    <string name="settings_voice_test_complete">Voice test complete.</string>
+    <string name="settings_voice_test_failed">Voice test failed: %1$s</string>
+    <string name="settings_voice_test_timeout">Voice test timed out. Check logcat and model files.</string>
     <string name="chat_searching_memory">Searching memory...</string>
     <string name="overlay_searching_memory">Searching memory...</string>
 </resources>

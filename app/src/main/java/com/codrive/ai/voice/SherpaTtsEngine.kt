@@ -17,10 +17,12 @@ import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
 import java.util.concurrent.Executors
+import kotlin.math.ceil
 
 class SherpaTtsEngine(
     private val context: Context,
-    private val storage: ModelStorage
+    private val storage: ModelStorage,
+    private val speakObserver: SpeakObserver? = null
 ) : TtsEngine {
     private val executor = Executors.newSingleThreadExecutor()
     private var tts: OfflineTts? = null
@@ -29,15 +31,24 @@ class SherpaTtsEngine(
     override fun speak(message: String) {
         val text = message.trim()
         if (text.isEmpty()) {
+            Log.d(TAG, "speak ignored: empty text")
             return
         }
+        Log.d(TAG, "speak queued: chars=${text.length}")
         executor.submit {
             try {
+                Log.d(TAG, "speak started")
                 val engine = tts ?: createTts().also { tts = it }
+                Log.d(TAG, "generating audio")
                 val audio = engine.generate(text, 0, 1.0f)
+                Log.d(TAG, "generated audio: sampleRate=${audio.sampleRate} samples=${audio.samples.size}")
                 playAudio(audio)
+                waitForPlaybackToFinish(audio)
+                Log.d(TAG, "speak completed")
+                speakObserver?.onSpeakFinished(true, null)
             } catch (ex: Exception) {
-                Log.w(TAG, "Sherpa TTS failed", ex)
+                Log.e(TAG, "Sherpa TTS failed during speak", ex)
+                speakObserver?.onSpeakFinished(false, ex.message)
             }
         }
     }
@@ -49,6 +60,7 @@ class SherpaTtsEngine(
     }
 
     fun shutdown() {
+        Log.d(TAG, "shutdown requested")
         stop()
         tts?.release()
         tts = null
@@ -62,13 +74,13 @@ class SherpaTtsEngine(
         val espeakArchive = storage.destinationFile(ModelManifest.TTS_ESPEAK_DATA)
         val espeakDir = storage.extractedDir(ModelManifest.TTS_ESPEAK_DATA)
 
-        if (!modelFile.exists() || modelFile.length() < ModelManifest.TTS_MODEL.sizeBytes) {
+        if (!storage.isValidFile(ModelManifest.TTS_MODEL)) {
             throw IllegalStateException("TTS model file invalid: ${modelFile.absolutePath}")
         }
-        if (!configFile.exists() || configFile.length() < ModelManifest.TTS_CONFIG.sizeBytes) {
+        if (!storage.isValidFile(ModelManifest.TTS_CONFIG)) {
             throw IllegalStateException("TTS config file invalid: ${configFile.absolutePath}")
         }
-        if (!tokensFile.exists() || tokensFile.length() < ModelManifest.TTS_TOKENS.sizeBytes) {
+        if (!storage.isValidFile(ModelManifest.TTS_TOKENS)) {
             throw IllegalStateException("TTS tokens file invalid: ${tokensFile.absolutePath}")
         }
         if (!espeakDir.exists() && !espeakArchive.exists()) {
@@ -76,11 +88,19 @@ class SherpaTtsEngine(
         }
 
         if (!espeakDir.exists() && espeakArchive.exists()) {
+            Log.d(TAG, "Extracting eSpeak archive: ${espeakArchive.absolutePath} -> ${espeakDir.absolutePath}")
             ModelArchiveExtractor.extractTarBz2(espeakArchive, espeakDir)
+            Log.d(TAG, "eSpeak archive extracted")
         }
 
-        // FIX A: Handle the nested folder created by the tarball
         val espeakActualDir = File(espeakDir, "espeak-ng-data").takeIf { it.exists() } ?: espeakDir
+        Log.d(
+            TAG,
+            "createTts files model=${modelFile.absolutePath}(${modelFile.length()}) " +
+                "config=${configFile.absolutePath}(${configFile.length()}) " +
+                "tokens=${tokensFile.absolutePath}(${tokensFile.length()}) " +
+                "espeak=${espeakActualDir.absolutePath} exists=${espeakActualDir.exists()}"
+        )
 
         val vitsConfig = OfflineTtsVitsModelConfig().apply {
             model = modelFile.absolutePath
@@ -96,7 +116,7 @@ class SherpaTtsEngine(
         val modelConfig = OfflineTtsModelConfig().apply {
             vits = vitsConfig
             numThreads = 2
-            debug = false
+            debug = true
             provider = "cpu"
         }
 
@@ -108,11 +128,18 @@ class SherpaTtsEngine(
             silenceScale = 0.2f
         }
 
-        return OfflineTts(null, ttsConfig)
+        Log.d(TAG, "Creating OfflineTts instance")
+        return OfflineTts(null, ttsConfig).also {
+            Log.d(TAG, "OfflineTts instance created")
+        }
     }
 
     private fun playAudio(audio: GeneratedAudio) {
         val floatSamples = audio.samples
+        if (floatSamples.isEmpty()) {
+            Log.w(TAG, "playAudio skipped: generated 0 samples")
+            return
+        }
         val shorts = ShortArray(floatSamples.size)
         for (i in floatSamples.indices) {
             val clamped = floatSamples[i].coerceIn(-1.0f, 1.0f)
@@ -137,13 +164,39 @@ class SherpaTtsEngine(
             AudioTrack.MODE_STATIC,
             AudioManager.AUDIO_SESSION_ID_GENERATE
         )
-        track.write(shorts, 0, shorts.size)
+        val writeResult = track.write(shorts, 0, shorts.size)
+        Log.d(
+            TAG,
+            "AudioTrack writeResult=$writeResult state=${track.state} playState=${track.playState} bufferBytes=${shorts.size * 2}"
+        )
+        if (track.state != AudioTrack.STATE_INITIALIZED) {
+            track.release()
+            throw IllegalStateException("AudioTrack not initialized; state=${track.state}")
+        }
         track.play()
         audioTrack?.release()
         audioTrack = track
     }
 
+    private fun waitForPlaybackToFinish(audio: GeneratedAudio) {
+        if (audio.sampleRate <= 0 || audio.samples.isEmpty()) {
+            return
+        }
+        val durationMs = ceil((audio.samples.size.toDouble() / audio.sampleRate.toDouble()) * 1000.0).toLong()
+        val waitMs = (durationMs + 120L).coerceAtMost(15_000L)
+        Log.d(TAG, "waiting for playback completion: ${waitMs}ms")
+        try {
+            Thread.sleep(waitMs)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+
     companion object {
         private const val TAG = "SherpaTtsEngine"
     }
+}
+
+fun interface SpeakObserver {
+    fun onSpeakFinished(success: Boolean, errorMessage: String?)
 }

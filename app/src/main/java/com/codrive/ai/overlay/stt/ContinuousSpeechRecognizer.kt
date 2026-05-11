@@ -8,6 +8,7 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 
 class ContinuousSpeechRecognizer(
     private val context: Context,
@@ -41,12 +42,19 @@ class ContinuousSpeechRecognizer(
             val onDeviceRecognizer = runCatching {
                 SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             }.getOrNull()
-            if (onDeviceRecognizer == null) {
-                callbacks.onListeningStateChanged("On-device speech recognition unavailable.")
+            val recognizerInstance = onDeviceRecognizer ?: runCatching {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }.getOrNull()
+
+            if (recognizerInstance == null) {
+                callbacks.onListeningStateChanged("Speech recognizer unavailable.")
                 running = false
                 return
             }
-            recognizer = onDeviceRecognizer.apply {
+            if (onDeviceRecognizer == null) {
+                Log.w(TAG, "On-device recognizer unavailable; falling back to system recognizer.")
+            }
+            recognizer = recognizerInstance.apply {
                 setRecognitionListener(buildListener())
             }
         }
@@ -96,6 +104,7 @@ class ContinuousSpeechRecognizer(
             r.startListening(intent)
         }.onFailure {
             callbacks.onListeningStateChanged("Could not start listening. Retrying...")
+            Log.w(TAG, "startListening failed", it)
             startListeningSoon(500L)
         }
     }
@@ -127,6 +136,7 @@ class ContinuousSpeechRecognizer(
                 if (!running) {
                     return
                 }
+                Log.w(TAG, "Speech recognizer error: $error (${errorMessage(error)})")
                 if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
                     callbacks.onListeningStateChanged(
                         "Offline speech recognition unavailable. Install an offline language pack."
@@ -188,6 +198,10 @@ class ContinuousSpeechRecognizer(
 
     private fun restartDelay(error: Int): Long {
         return if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 350L else 120L
+    }
+
+    companion object {
+        private const val TAG = "ContinuousSpeechRec"
     }
 }
 
