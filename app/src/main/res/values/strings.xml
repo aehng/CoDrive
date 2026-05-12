@@ -75,6 +75,8 @@
     <string name="overlay_speaking_response">Speaking response...</string>
     <string name="overlay_mic_on">Mic On</string>
     <string name="overlay_mic_off">Mic Off</string>
+    <string name="overlay_audio_speaker">Audio: Speaker</string>
+    <string name="overlay_audio_ear">Audio: Ear</string>
     <string name="overlay_push_to_talk">Hold to Talk</string>
     <string name="overlay_listening_muted">Mic muted. Hold to Talk to issue a command.</string>
     <string name="overlay_listening_push_to_talk_active">Listening (push-to-talk)...</string>
@@ -104,6 +106,7 @@
     <string name="settings_command_delay_label">Command debounce delay (ms)</string>
     <string name="settings_test_voice_button">Test Voice Output</string>
     <string name="settings_barge_in_enabled">Allow interrupt while CoDrive is speaking (Barge-in)</string>
+    <string name="settings_speakerphone_preferred">Use speakerphone for voice mode (off = earpiece call style)</string>
     <string name="settings_voice_test_sample">Sherpa voice test. If you can hear this, the engine is working.</string>
     <string name="settings_voice_test_missing_models">Sherpa models missing. Download voice models to test.</string>
     <string name="settings_voice_test_sherpa">Testing Sherpa voice...</string>

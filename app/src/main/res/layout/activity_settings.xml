@@ -209,6 +209,13 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_barge_in_enabled" />
 
+            <CheckBox
+                android:id="@+id/settingsSpeakerphonePreferred"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_speakerphone_preferred" />
+
             <Button
                 android:id="@+id/settingsTestVoiceButton"
                 android:layout_width="match_parent"

@@ -5,6 +5,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
@@ -83,6 +84,7 @@ public class OverlayBubbleService extends Service {
     private EditText inputText;
     private Button sendButton;
     private ToggleButton micToggleButton;
+    private ToggleButton audioRouteToggleButton;
     private Button pushToTalkButton;
 
     private int startX;
@@ -106,6 +108,11 @@ public class OverlayBubbleService extends Service {
     private TtsEngine ttsEngine;
     private InternVlRuntime vlmRuntime;
     private boolean micSuppressedForTts = false;
+    private AudioManager audioManager;
+    private boolean commAudioModeApplied = false;
+    private int previousAudioMode = AudioManager.MODE_NORMAL;
+    private boolean previousSpeakerphoneOn = false;
+    private boolean routeToSpeaker = true;
     private String lastAssistantSpokenNormalized = "";
     private long lastAssistantSpokenAtMs = 0L;
     private final Runnable autoSubmitRunnable = new Runnable() {
@@ -147,6 +154,7 @@ public class OverlayBubbleService extends Service {
     public void onCreate() {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         backgroundExecutor = Executors.newSingleThreadExecutor();
         identityDatabase = Room.databaseBuilder(
                 getApplicationContext(),
@@ -155,6 +163,8 @@ public class OverlayBubbleService extends Service {
         ).build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
+        // Hard default every overlay session: main loudspeaker.
+        routeToSpeaker = true;
         activeSessionManager = new ActiveSessionManager();
         uiTreePruner = new UiTreePruner();
         ModelStorage storage = new ModelStorage(new File(getApplicationContext().getNoBackupFilesDir(), "models"));
@@ -227,6 +237,7 @@ public class OverlayBubbleService extends Service {
                     }
                 };
         refreshVoiceEngines(true);
+        ensureCommunicationAudioMode();
         incrementalRequestManager.registerCallback(result -> mainHandler.post(() -> {
             if (sendButton != null) {
                 sendButton.setEnabled(true);
@@ -284,6 +295,7 @@ public class OverlayBubbleService extends Service {
         if (continuousSpeechRecognizer != null) {
             continuousSpeechRecognizer.stop();
         }
+        restoreAudioMode();
         releaseTtsEngine();
         if (identityDatabase != null) {
             identityDatabase.close();
@@ -375,6 +387,7 @@ public class OverlayBubbleService extends Service {
         sendButton = overlayRoot.findViewById(R.id.overlaySendButton);
         micToggleButton = overlayRoot.findViewById(R.id.overlayMicToggleButton);
         pushToTalkButton = overlayRoot.findViewById(R.id.overlayPushToTalkButton);
+        audioRouteToggleButton = overlayRoot.findViewById(R.id.overlayAudioRouteToggleButton);
         Button openChatButton = overlayRoot.findViewById(R.id.overlayOpenChatButton);
         Button closeBubbleButton = overlayRoot.findViewById(R.id.overlayCloseBubbleButton);
 
@@ -393,6 +406,13 @@ public class OverlayBubbleService extends Service {
         }
         if (pushToTalkButton != null) {
             pushToTalkButton.setOnTouchListener((view, event) -> handlePushToTalkTouch(event));
+        }
+        if (audioRouteToggleButton != null) {
+            audioRouteToggleButton.setChecked(true);
+            audioRouteToggleButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                routeToSpeaker = isChecked;
+                ensureCommunicationAudioMode();
+            });
         }
 
         openChatButton.setOnClickListener(v -> {
@@ -504,6 +524,7 @@ public class OverlayBubbleService extends Service {
             appendLine(getString(R.string.chat_action_prefix), result.getExecutionResult().getMessage());
         }
         if (ttsEngine != null && !TextUtils.isEmpty(result.getFinalFeedback())) {
+            ensureCommunicationAudioMode();
             rememberAssistantSpeech(result.getFinalFeedback());
             if (!isBargeInEnabled()) {
                 suppressMicForAssistantSpeech(result.getFinalFeedback());
@@ -666,6 +687,7 @@ public class OverlayBubbleService extends Service {
         if (continuousSpeechRecognizer == null) {
             return;
         }
+        ensureCommunicationAudioMode();
         if (!isContinuousListeningEnabled()) {
             updateListeningStatus(getString(R.string.overlay_listening_muted));
             return;
@@ -877,6 +899,39 @@ public class OverlayBubbleService extends Service {
         );
     }
 
+    private void ensureCommunicationAudioMode() {
+        if (audioManager == null) {
+            return;
+        }
+        try {
+            if (!commAudioModeApplied) {
+                previousAudioMode = audioManager.getMode();
+                previousSpeakerphoneOn = audioManager.isSpeakerphoneOn();
+                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                commAudioModeApplied = true;
+                Log.d(TAG, "Applied communication audio mode for full-duplex voice.");
+            }
+            audioManager.setSpeakerphoneOn(routeToSpeaker);
+        } catch (Exception ex) {
+            Log.w(TAG, "Failed to apply communication audio mode", ex);
+        }
+    }
+
+    private void restoreAudioMode() {
+        if (audioManager == null || !commAudioModeApplied) {
+            return;
+        }
+        try {
+            audioManager.setSpeakerphoneOn(previousSpeakerphoneOn);
+            audioManager.setMode(previousAudioMode);
+            Log.d(TAG, "Restored previous audio mode.");
+        } catch (Exception ex) {
+            Log.w(TAG, "Failed to restore previous audio mode", ex);
+        } finally {
+            commAudioModeApplied = false;
+        }
+    }
+
     private void detachOverlay() {
         if (overlayRoot != null && windowManager != null) {
             windowManager.removeView(overlayRoot);
@@ -889,6 +944,7 @@ public class OverlayBubbleService extends Service {
             inputText = null;
             sendButton = null;
             micToggleButton = null;
+            audioRouteToggleButton = null;
             pushToTalkButton = null;
             layoutParams = null;
         }

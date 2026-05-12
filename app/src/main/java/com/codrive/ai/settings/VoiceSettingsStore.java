@@ -15,6 +15,7 @@ public final class VoiceSettingsStore {
     private static final String KEY_STT_SPEECH_THRESHOLD = "voice_stt_speech_threshold";
     private static final String KEY_STT_MIN_VOICED_MS = "voice_stt_min_voiced_ms";
     private static final String KEY_STT_SILENCE_END_MS = "voice_stt_silence_end_ms";
+    private static final String KEY_PREFER_SPEAKERPHONE = "voice_prefer_speakerphone";
 
     private static final String DEFAULT_LOCALE = "en-US";
     private static final float DEFAULT_RATE = 1.0f;
@@ -34,6 +35,7 @@ public final class VoiceSettingsStore {
     private static final int DEFAULT_STT_SILENCE_END_MS = 250;
     private static final int MIN_STT_SILENCE_END_MS = 120;
     private static final int MAX_STT_SILENCE_END_MS = 900;
+    private static final boolean DEFAULT_PREFER_SPEAKERPHONE = true;
 
     private final SharedPreferences prefs;
 
@@ -128,6 +130,14 @@ public final class VoiceSettingsStore {
         prefs.edit()
             .putInt(KEY_STT_SILENCE_END_MS, clampInt(silenceEndMs, MIN_STT_SILENCE_END_MS, MAX_STT_SILENCE_END_MS))
             .apply();
+    }
+
+    public boolean isPreferSpeakerphone() {
+        return prefs.getBoolean(KEY_PREFER_SPEAKERPHONE, DEFAULT_PREFER_SPEAKERPHONE);
+    }
+
+    public void setPreferSpeakerphone(boolean preferSpeakerphone) {
+        prefs.edit().putBoolean(KEY_PREFER_SPEAKERPHONE, preferSpeakerphone).apply();
     }
 
     private static String sanitizeLocaleTag(String tag) {

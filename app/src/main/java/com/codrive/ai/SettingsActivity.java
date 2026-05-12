@@ -57,6 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView ttsPitchValueText;
     private CheckBox sherpaEnabledCheckbox;
     private CheckBox bargeInEnabledCheckbox;
+    private CheckBox speakerphonePreferredCheckbox;
     private SeekBar commandDelaySeekBar;
     private TextView commandDelayValueText;
     private SeekBar speechThresholdSeekBar;
@@ -111,6 +112,7 @@ public class SettingsActivity extends AppCompatActivity {
         ttsPitchValueText = findViewById(R.id.settingsTtsPitchValue);
         sherpaEnabledCheckbox = findViewById(R.id.settingsSherpaEnabled);
         bargeInEnabledCheckbox = findViewById(R.id.settingsBargeInEnabled);
+        speakerphonePreferredCheckbox = findViewById(R.id.settingsSpeakerphonePreferred);
         commandDelaySeekBar = findViewById(R.id.settingsCommandDelaySeekBar);
         commandDelayValueText = findViewById(R.id.settingsCommandDelayValue);
         speechThresholdSeekBar = findViewById(R.id.settingsSpeechThresholdSeekBar);
@@ -240,6 +242,7 @@ public class SettingsActivity extends AppCompatActivity {
         silenceEndSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
                 silenceEndValueText.setText((progress + STT_SILENCE_END_MIN) + " ms")
         ));
+
     }
 
     private void loadCurrentSettings() {
@@ -265,6 +268,7 @@ public class SettingsActivity extends AppCompatActivity {
         updateTtsPitchValue(ttsPitch);
         sherpaEnabledCheckbox.setChecked(voiceSettingsStore.isSherpaEnabled());
         bargeInEnabledCheckbox.setChecked(voiceSettingsStore.isBargeInEnabled());
+        speakerphonePreferredCheckbox.setChecked(voiceSettingsStore.isPreferSpeakerphone());
         long currentDelay = voiceSettingsStore.getCommandDelayMs();
         commandDelaySeekBar.setProgress((int) Math.max(0L, currentDelay - COMMAND_DELAY_MIN_MS));
         commandDelayValueText.setText(currentDelay + " ms");
@@ -292,6 +296,7 @@ public class SettingsActivity extends AppCompatActivity {
         voiceSettingsStore.saveVoiceSettings(sttLocale, ttsLocale, ttsRate, ttsPitch);
         voiceSettingsStore.setSherpaEnabled(sherpaEnabledCheckbox.isChecked());
         voiceSettingsStore.setBargeInEnabled(bargeInEnabledCheckbox.isChecked());
+        voiceSettingsStore.setPreferSpeakerphone(speakerphonePreferredCheckbox.isChecked());
         voiceSettingsStore.setCommandDelayMs(commandDelaySeekBar.getProgress() + COMMAND_DELAY_MIN_MS);
         voiceSettingsStore.setSttSpeechThreshold(speechThresholdSeekBar.getProgress() + STT_SPEECH_THRESHOLD_MIN);
         voiceSettingsStore.setSttMinVoicedMs(minVoicedSeekBar.getProgress() + STT_MIN_VOICED_MIN);

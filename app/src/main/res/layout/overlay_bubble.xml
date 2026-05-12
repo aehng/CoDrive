@@ -75,6 +75,15 @@
                 android:text="@string/overlay_push_to_talk" />
         </LinearLayout>
 
+        <ToggleButton
+            android:id="@+id/overlayAudioRouteToggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:checked="true"
+            android:textOff="@string/overlay_audio_ear"
+            android:textOn="@string/overlay_audio_speaker" />
+
         <ScrollView
             android:id="@+id/overlayTranscriptScroll"
             android:layout_width="match_parent"
