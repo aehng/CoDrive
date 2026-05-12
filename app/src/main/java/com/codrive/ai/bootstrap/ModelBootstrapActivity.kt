@@ -1,10 +1,14 @@
 package com.codrive.ai.bootstrap
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
@@ -14,6 +18,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.codrive.ai.R
+import com.codrive.ai.ChatActivity
+import com.codrive.ai.MainActivity
+import com.codrive.ai.SettingsActivity
 import com.codrive.ai.modeldownload.DownloadState
 import com.codrive.ai.modeldownload.ModelDownloadScheduler
 import com.codrive.ai.modeldownload.ModelStorage
@@ -45,12 +52,17 @@ class ModelBootstrapActivity : AppCompatActivity() {
         }).get(ModelBootstrapViewModel::class.java)
 
         val statusText = findViewById<TextView>(R.id.bootstrapStatus)
+        val backButton = findViewById<ImageButton>(R.id.bootstrapBackButton)
+        val menuButton = findViewById<ImageButton>(R.id.bootstrapMenuButton)
         val downloadAllButton = findViewById<Button>(R.id.bootstrapDownloadAllButton)
         val useSherpaSwitch = findViewById<Switch>(R.id.bootstrapUseSherpaSwitch)
         val sherpaHint = findViewById<TextView>(R.id.bootstrapSherpaHint)
         wifiOnlySwitch = findViewById(R.id.bootstrapWifiOnlySwitch)
         chargingOnlySwitch = findViewById(R.id.bootstrapChargingOnlySwitch)
         val listContainer = findViewById<LinearLayout>(R.id.bootstrapModelList)
+
+        backButton.setOnClickListener { finish() }
+        menuButton.setOnClickListener { showNavigationMenu(it) }
 
         val voiceSettings = VoiceSettingsStore.create(this)
         useSherpaSwitch.isChecked = voiceSettings.isSherpaEnabled()
@@ -144,6 +156,31 @@ class ModelBootstrapActivity : AppCompatActivity() {
                     progressBar.progress = 0
                 }
             }
+        }
+    }
+
+    private fun showNavigationMenu(anchor: View) {
+        val popupMenu = PopupMenu(this, anchor)
+        popupMenu.menuInflater.inflate(R.menu.chat_navigation_menu, popupMenu.menu)
+        popupMenu.setOnMenuItemClickListener(this::onNavigationItemClicked)
+        popupMenu.show()
+    }
+
+    private fun onNavigationItemClicked(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_chat_home -> {
+                startActivity(Intent(this, MainActivity::class.java))
+                true
+            }
+            R.id.menu_chat_chat -> {
+                startActivity(Intent(this, ChatActivity::class.java))
+                true
+            }
+            R.id.menu_chat_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            else -> false
         }
     }
 }

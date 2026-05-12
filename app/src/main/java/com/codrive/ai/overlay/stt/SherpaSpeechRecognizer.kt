@@ -25,6 +25,13 @@ class SherpaSpeechRecognizer(
         }
         running = true
         callbacks.onListeningStateChanged("Listening for commands...")
+        startListeningCycle()
+    }
+
+    private fun startListeningCycle() {
+        if (!running) {
+            return
+        }
         engine.startListening(
             onProcessing = { callbacks.onListeningStateChanged("Processing speech...") },
             onTranscript = { transcript ->
@@ -40,7 +47,7 @@ class SherpaSpeechRecognizer(
                 }
                 callbacks.onListeningStateChanged("Listening for commands...")
                 if (running) {
-                    mainHandler.postDelayed({ start() }, 120L)
+                    mainHandler.postDelayed({ startListeningCycle() }, 120L)
                 }
             }
         )

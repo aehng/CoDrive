@@ -53,10 +53,18 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText ttsLocaleInput;
     private SeekBar ttsRateSeekBar;
     private TextView ttsRateValueText;
-    private EditText ttsPitchInput;
+    private SeekBar ttsPitchSeekBar;
+    private TextView ttsPitchValueText;
     private CheckBox sherpaEnabledCheckbox;
+    private CheckBox bargeInEnabledCheckbox;
     private SeekBar commandDelaySeekBar;
     private TextView commandDelayValueText;
+    private SeekBar speechThresholdSeekBar;
+    private TextView speechThresholdValueText;
+    private SeekBar minVoicedSeekBar;
+    private TextView minVoicedValueText;
+    private SeekBar silenceEndSeekBar;
+    private TextView silenceEndValueText;
     private TtsEngine testTtsEngine;
     private LlmSettingsStore settingsStore;
     private VoiceSettingsStore voiceSettingsStore;
@@ -66,10 +74,18 @@ public class SettingsActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable voiceTestTimeoutRunnable;
     private static final String DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+    private static final long COMMAND_DELAY_MIN_MS = 100L;
     private static final long VOICE_TEST_TIMEOUT_MS = 12_000L;
     private static final float TTS_RATE_MIN = 0.7f;
     private static final float TTS_RATE_MAX = 1.3f;
     private static final float TTS_RATE_STEP = 0.01f;
+    private static final int TTS_PITCH_MIN_PROGRESS = 0;
+    private static final float TTS_PITCH_MIN = 0.7f;
+    private static final float TTS_PITCH_MAX = 1.3f;
+    private static final float TTS_PITCH_STEP = 0.01f;
+    private static final int STT_SPEECH_THRESHOLD_MIN = 200;
+    private static final int STT_MIN_VOICED_MIN = 80;
+    private static final int STT_SILENCE_END_MIN = 120;
     private static final String TAG = "SettingsActivity";
 
     @Override
@@ -91,14 +107,23 @@ public class SettingsActivity extends AppCompatActivity {
         ttsLocaleInput = findViewById(R.id.settingsTtsLocaleInput);
         ttsRateSeekBar = findViewById(R.id.settingsTtsRateSeekBar);
         ttsRateValueText = findViewById(R.id.settingsTtsRateValue);
-        ttsPitchInput = findViewById(R.id.settingsTtsPitchInput);
+        ttsPitchSeekBar = findViewById(R.id.settingsTtsPitchSeekBar);
+        ttsPitchValueText = findViewById(R.id.settingsTtsPitchValue);
         sherpaEnabledCheckbox = findViewById(R.id.settingsSherpaEnabled);
+        bargeInEnabledCheckbox = findViewById(R.id.settingsBargeInEnabled);
         commandDelaySeekBar = findViewById(R.id.settingsCommandDelaySeekBar);
         commandDelayValueText = findViewById(R.id.settingsCommandDelayValue);
+        speechThresholdSeekBar = findViewById(R.id.settingsSpeechThresholdSeekBar);
+        speechThresholdValueText = findViewById(R.id.settingsSpeechThresholdValue);
+        minVoicedSeekBar = findViewById(R.id.settingsMinVoicedSeekBar);
+        minVoicedValueText = findViewById(R.id.settingsMinVoicedValue);
+        silenceEndSeekBar = findViewById(R.id.settingsSilenceEndSeekBar);
+        silenceEndValueText = findViewById(R.id.settingsSilenceEndValue);
         Button loadModelsButton = findViewById(R.id.settingsLoadModelsButton);
         Button saveButton = findViewById(R.id.settingsSaveButton);
         Button testVoiceButton = findViewById(R.id.settingsTestVoiceButton);
         ImageButton menuButton = findViewById(R.id.settingsMenuButton);
+        ImageButton backButton = findViewById(R.id.settingsBackButton);
 
         modelCatalog = new LlmModelCatalog();
 
@@ -126,6 +151,7 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         menuButton.setOnClickListener(this::showNavigationMenu);
+        backButton.setOnClickListener(v -> finish());
 
         settingsStore = LlmSettingsStore.create(getApplicationContext());
         voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
@@ -179,7 +205,7 @@ public class SettingsActivity extends AppCompatActivity {
         commandDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                long delay = progress + 500L;
+                long delay = progress + COMMAND_DELAY_MIN_MS;
                 commandDelayValueText.setText(delay + " ms");
             }
 
@@ -189,6 +215,31 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+
+        ttsPitchSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                updateTtsPitchValue(getTtsPitchFromSeekBar());
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        speechThresholdSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                speechThresholdValueText.setText(String.valueOf(progress + STT_SPEECH_THRESHOLD_MIN))
+        ));
+
+        minVoicedSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                minVoicedValueText.setText((progress + STT_MIN_VOICED_MIN) + " ms")
+        ));
+
+        silenceEndSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                silenceEndValueText.setText((progress + STT_SILENCE_END_MIN) + " ms")
+        ));
     }
 
     private void loadCurrentSettings() {
@@ -209,11 +260,23 @@ public class SettingsActivity extends AppCompatActivity {
         float ttsRate = voiceSettingsStore.getTtsRate();
         ttsRateSeekBar.setProgress(progressForRate(ttsRate));
         updateTtsRateValue(ttsRate);
-        ttsPitchInput.setText(String.valueOf(voiceSettingsStore.getTtsPitch()));
+        float ttsPitch = voiceSettingsStore.getTtsPitch();
+        ttsPitchSeekBar.setProgress(progressForPitch(ttsPitch));
+        updateTtsPitchValue(ttsPitch);
         sherpaEnabledCheckbox.setChecked(voiceSettingsStore.isSherpaEnabled());
+        bargeInEnabledCheckbox.setChecked(voiceSettingsStore.isBargeInEnabled());
         long currentDelay = voiceSettingsStore.getCommandDelayMs();
-        commandDelaySeekBar.setProgress((int) (currentDelay - 500));
+        commandDelaySeekBar.setProgress((int) Math.max(0L, currentDelay - COMMAND_DELAY_MIN_MS));
         commandDelayValueText.setText(currentDelay + " ms");
+        int speechThreshold = voiceSettingsStore.getSttSpeechThreshold();
+        speechThresholdSeekBar.setProgress(speechThreshold - STT_SPEECH_THRESHOLD_MIN);
+        speechThresholdValueText.setText(String.valueOf(speechThreshold));
+        int minVoiced = voiceSettingsStore.getSttMinVoicedMs();
+        minVoicedSeekBar.setProgress(minVoiced - STT_MIN_VOICED_MIN);
+        minVoicedValueText.setText(minVoiced + " ms");
+        int silenceEnd = voiceSettingsStore.getSttSilenceEndMs();
+        silenceEndSeekBar.setProgress(silenceEnd - STT_SILENCE_END_MIN);
+        silenceEndValueText.setText(silenceEnd + " ms");
     }
 
     private void saveSettings() {
@@ -224,11 +287,15 @@ public class SettingsActivity extends AppCompatActivity {
         String sttLocale = sttLocaleInput.getText().toString().trim();
         String ttsLocale = ttsLocaleInput.getText().toString().trim();
         float ttsRate = getTtsRateFromSeekBar();
-        float ttsPitch = parseFloatOrDefault(ttsPitchInput.getText().toString(), voiceSettingsStore.getTtsPitch());
+        float ttsPitch = getTtsPitchFromSeekBar();
 
         voiceSettingsStore.saveVoiceSettings(sttLocale, ttsLocale, ttsRate, ttsPitch);
         voiceSettingsStore.setSherpaEnabled(sherpaEnabledCheckbox.isChecked());
-        voiceSettingsStore.setCommandDelayMs(commandDelaySeekBar.getProgress() + 500L);
+        voiceSettingsStore.setBargeInEnabled(bargeInEnabledCheckbox.isChecked());
+        voiceSettingsStore.setCommandDelayMs(commandDelaySeekBar.getProgress() + COMMAND_DELAY_MIN_MS);
+        voiceSettingsStore.setSttSpeechThreshold(speechThresholdSeekBar.getProgress() + STT_SPEECH_THRESHOLD_MIN);
+        voiceSettingsStore.setSttMinVoicedMs(minVoicedSeekBar.getProgress() + STT_MIN_VOICED_MIN);
+        voiceSettingsStore.setSttSilenceEndMs(silenceEndSeekBar.getProgress() + STT_SILENCE_END_MIN);
 
         settingsStore.saveProviderAndModel(provider, model);
         if (!TextUtils.isEmpty(enteredKey)) {
@@ -378,17 +445,6 @@ public class SettingsActivity extends AppCompatActivity {
         clearModelList();
     }
 
-    private float parseFloatOrDefault(String value, float fallback) {
-        if (TextUtils.isEmpty(value)) {
-            return fallback;
-        }
-        try {
-            return Float.parseFloat(value);
-        } catch (NumberFormatException ex) {
-            return fallback;
-        }
-    }
-
     @Override
     protected void onDestroy() {
         releaseTestTtsEngine();
@@ -495,8 +551,40 @@ public class SettingsActivity extends AppCompatActivity {
         return Math.round((clamped - TTS_RATE_MIN) / TTS_RATE_STEP);
     }
 
+    private float getTtsPitchFromSeekBar() {
+        return TTS_PITCH_MIN + (ttsPitchSeekBar.getProgress() * TTS_PITCH_STEP);
+    }
+
+    private int progressForPitch(float pitch) {
+        float clamped = Math.max(TTS_PITCH_MIN, Math.min(TTS_PITCH_MAX, pitch));
+        return Math.max(TTS_PITCH_MIN_PROGRESS, Math.round((clamped - TTS_PITCH_MIN) / TTS_PITCH_STEP));
+    }
+
     private void updateTtsRateValue(float rate) {
         ttsRateValueText.setText(String.format(Locale.US, "%.2f", rate));
+    }
+
+    private void updateTtsPitchValue(float pitch) {
+        ttsPitchValueText.setText(String.format(Locale.US, "%.2f", pitch));
+    }
+
+    private SeekBar.OnSeekBarChangeListener simpleSeekBarListener(ProgressChanged onProgressChanged) {
+        return new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                onProgressChanged.run(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        };
+    }
+
+    private interface ProgressChanged {
+        void run(int progress);
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {

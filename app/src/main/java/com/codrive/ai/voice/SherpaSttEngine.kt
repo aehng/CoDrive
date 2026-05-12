@@ -2,11 +2,14 @@ package com.codrive.ai.voice
 
 import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
+import android.media.MediaRecorder.AudioSource
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import com.codrive.ai.contracts.SttEngine
 import com.codrive.ai.modeldownload.ModelStorage
 import com.codrive.ai.models.ModelManifest
+import com.codrive.ai.settings.VoiceSettingsStore
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.HomophoneReplacerConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
@@ -25,6 +28,7 @@ class SherpaSttEngine(
     private val executor = Executors.newSingleThreadExecutor()
     private val running = AtomicBoolean(false)
     private var recognizer: OfflineRecognizer? = null
+    private val voiceSettingsStore = VoiceSettingsStore.create(context)
 
     override fun startListening(onTranscript: (String) -> Unit) {
         startListening(null, onTranscript)
@@ -120,17 +124,29 @@ class SherpaSttEngine(
         )
         val bufferSize = (minBuffer * 2).coerceAtLeast(SAMPLE_RATE)
         val audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
+            AudioSource.VOICE_COMMUNICATION,
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize
         )
+        val sessionId = audioRecord.audioSessionId
+        val aec = if (AcousticEchoCanceler.isAvailable()) {
+            runCatching { AcousticEchoCanceler.create(sessionId) }.getOrNull()?.apply { enabled = true }
+        } else {
+            null
+        }
+        val ns = if (NoiseSuppressor.isAvailable()) {
+            runCatching { NoiseSuppressor.create(sessionId) }.getOrNull()?.apply { enabled = true }
+        } else {
+            null
+        }
 
         val buffer = ShortArray(bufferSize / 2)
         val samples = ArrayList<Short>()
         var silenceMs = 0L
         var sawSpeech = false
+        var voicedMs = 0L
 
         audioRecord.startRecording()
         while (running.get()) {
@@ -147,15 +163,16 @@ class SherpaSttEngine(
             }
 
             val frameMs = (read * 1000L) / SAMPLE_RATE
-            if (peak > SPEECH_THRESHOLD) {
+            if (peak > voiceSettingsStore.sttSpeechThreshold) {
                 if (!sawSpeech) {
                     sawSpeech = true
                     onSpeechDetected?.invoke()
                 }
+                voicedMs += frameMs
                 silenceMs = 0L
             } else if (sawSpeech) {
                 silenceMs += frameMs
-                if (silenceMs >= SILENCE_END_MS) {
+                if (silenceMs >= voiceSettingsStore.sttSilenceEndMs.toLong()) {
                     break
                 }
             }
@@ -167,6 +184,13 @@ class SherpaSttEngine(
 
         audioRecord.stop()
         audioRecord.release()
+        runCatching { aec?.release() }
+        runCatching { ns?.release() }
+
+        // Reject short impulsive sounds (cough/click/tap noise) that often decode as garbage tokens.
+        if (!sawSpeech || voicedMs < voiceSettingsStore.sttMinVoicedMs.toLong()) {
+            return floatArrayOf()
+        }
 
         val floats = FloatArray(samples.size)
         for (i in samples.indices) {
@@ -178,8 +202,6 @@ class SherpaSttEngine(
     companion object {
         private const val TAG = "SherpaSttEngine"
         private const val SAMPLE_RATE = 16000
-        private const val SPEECH_THRESHOLD = 600
-        private const val SILENCE_END_MS = 500L
         private const val MAX_SECONDS = 12
         private const val MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS
     }

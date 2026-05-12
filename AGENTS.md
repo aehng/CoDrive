@@ -33,10 +33,11 @@ API key policy and Settings UX (tasks)
 - [x] Implement provider-adapter pattern in `LlmClient` so runtime wiring uses selected provider/model/key.
 - [x] Ensure prompt contract: model returns raw JSON object only (no explanatory text or markdown).
 
-Free-tier limits (Gemini 1.5 Flash - May 2026) — operational constraints
+Free-tier limits (Gemma 4 31B - May 2026) — operational constraints
 - **RPM:** 15 requests/min (Primary bottleneck — avoid rapid-fire scraping).
 - **TPM:** 250,000 tokens/min (Massive headroom for UI maps).
 - **RPD:** 1,500 requests/day.
+
 
 Strict action JSON schema (enforced)
 

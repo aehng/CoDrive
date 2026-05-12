@@ -105,6 +105,9 @@ public class OverlayBubbleService extends Service {
     private ContinuousSpeechRecognizer.Callbacks speechCallbacks;
     private TtsEngine ttsEngine;
     private InternVlRuntime vlmRuntime;
+    private boolean micSuppressedForTts = false;
+    private String lastAssistantSpokenNormalized = "";
+    private long lastAssistantSpokenAtMs = 0L;
     private final Runnable autoSubmitRunnable = new Runnable() {
         @Override
         public void run() {
@@ -119,7 +122,26 @@ public class OverlayBubbleService extends Service {
             }
         }
     };
-    private static final long PARTIAL_IDLE_MS = 750L;
+    private static final long PARTIAL_IDLE_MS = 300L;
+    private static final long BARGE_IN_COMMAND_DELAY_MS = 1200L;
+    private static final long ECHO_FILTER_WINDOW_MS = 15000L;
+    private static final double ECHO_SIMILARITY_THRESHOLD = 0.72;
+    private static final int ECHO_MIN_PHRASE_WORDS = 2;
+    private static final long TTS_SUPPRESS_MIN_MS = 1200L;
+    private static final long TTS_SUPPRESS_MAX_MS = 10000L;
+    private static final long TTS_SUPPRESS_PADDING_MS = 300L;
+    private static final long TTS_MS_PER_CHAR = 55L;
+    private final Runnable resumeAfterTtsRunnable = new Runnable() {
+        @Override
+        public void run() {
+            micSuppressedForTts = false;
+            if (isContinuousListeningEnabled()) {
+                startContinuousVoiceMode();
+            } else {
+                updateListeningStatus(getString(R.string.overlay_listening_muted));
+            }
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -146,12 +168,21 @@ public class OverlayBubbleService extends Service {
 
                     @Override
                     public void onSpeechDetected() {
-                        interruptActiveRequest(null);
+                        if (micSuppressedForTts) {
+                            return;
+                        }
                         mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_listening_speech_detected)));
                     }
 
                     @Override
                     public void onCommandReady(String command) {
+                        if (micSuppressedForTts) {
+                            return;
+                        }
+                        if (shouldDropAsEcho(command)) {
+                            mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_ignored_noise)));
+                            return;
+                        }
                         mainHandler.removeCallbacks(autoSubmitRunnable);
                         mainHandler.post(() -> {
                             clearLiveTranscript();
@@ -162,6 +193,9 @@ public class OverlayBubbleService extends Service {
 
                     @Override
                     public void onPartialTranscript(String partial) {
+                        if (micSuppressedForTts) {
+                            return;
+                        }
                         mainHandler.post(() -> {
                             if (partial != null) {
                                 updateLiveTranscript(partial);
@@ -177,6 +211,9 @@ public class OverlayBubbleService extends Service {
 
                     @Override
                     public void onCommandRejected(String reason) {
+                        if (micSuppressedForTts) {
+                            return;
+                        }
                         mainHandler.post(() -> {
                             // Cancel auto-submit when explicit rejection occurs
                             mainHandler.removeCallbacks(autoSubmitRunnable);
@@ -243,6 +280,7 @@ public class OverlayBubbleService extends Service {
         if (incrementalRequestManager != null) {
             incrementalRequestManager.endSession();
         }
+        mainHandler.removeCallbacks(resumeAfterTtsRunnable);
         if (continuousSpeechRecognizer != null) {
             continuousSpeechRecognizer.stop();
         }
@@ -429,6 +467,7 @@ public class OverlayBubbleService extends Service {
         }
 
         clearLiveTranscript();
+        cancelTtsMicSuppression();
         if (ttsEngine != null) {
             ttsEngine.stop();
         }
@@ -450,6 +489,9 @@ public class OverlayBubbleService extends Service {
         BiFunction<String, PruningOutcome, TracerBulletResult> runner = this::runTracerBullet;
         long delayMs = voiceSettingsStore.getCommandDelayMs();
         if (fromVoice) {
+            if (isBargeInEnabled()) {
+                delayMs = Math.max(delayMs, BARGE_IN_COMMAND_DELAY_MS);
+            }
             incrementalRequestManager.appendToActiveRequest(command, pruningOutcome, delayMs, runner);
         } else {
             incrementalRequestManager.startSession(command, pruningOutcome, 0, runner);
@@ -462,6 +504,10 @@ public class OverlayBubbleService extends Service {
             appendLine(getString(R.string.chat_action_prefix), result.getExecutionResult().getMessage());
         }
         if (ttsEngine != null && !TextUtils.isEmpty(result.getFinalFeedback())) {
+            rememberAssistantSpeech(result.getFinalFeedback());
+            if (!isBargeInEnabled()) {
+                suppressMicForAssistantSpeech(result.getFinalFeedback());
+            }
             ttsEngine.speak(result.getFinalFeedback());
         }
         scrollTranscriptToBottom();
@@ -639,6 +685,116 @@ public class OverlayBubbleService extends Service {
         }
         clearLiveTranscript();
         updateListeningStatus(statusMessage);
+    }
+
+    private void suppressMicForAssistantSpeech(String spokenText) {
+        micSuppressedForTts = true;
+        if (continuousSpeechRecognizer != null) {
+            continuousSpeechRecognizer.stop();
+        }
+        clearLiveTranscript();
+        updateListeningStatus(getString(R.string.overlay_speaking_response));
+        long delayMs = estimateSpeechDurationMs(spokenText);
+        mainHandler.removeCallbacks(resumeAfterTtsRunnable);
+        mainHandler.postDelayed(resumeAfterTtsRunnable, delayMs);
+    }
+
+    private void cancelTtsMicSuppression() {
+        micSuppressedForTts = false;
+        mainHandler.removeCallbacks(resumeAfterTtsRunnable);
+    }
+
+    private boolean isBargeInEnabled() {
+        return voiceSettingsStore != null && voiceSettingsStore.isBargeInEnabled();
+    }
+
+    private void rememberAssistantSpeech(String text) {
+        lastAssistantSpokenNormalized = normalizeForEcho(text);
+        lastAssistantSpokenAtMs = System.currentTimeMillis();
+    }
+
+    private boolean shouldDropAsEcho(String recognized) {
+        long ageMs = System.currentTimeMillis() - lastAssistantSpokenAtMs;
+        if (ageMs < 0 || ageMs > ECHO_FILTER_WINDOW_MS) {
+            return false;
+        }
+        String heard = normalizeForEcho(recognized);
+        String spoken = lastAssistantSpokenNormalized;
+        if (heard.isEmpty() || spoken.isEmpty()) {
+            return false;
+        }
+        if (spoken.contains(heard) || heard.contains(spoken)) {
+            return true;
+        }
+        if (containsSpokenPhrase(heard, spoken, ECHO_MIN_PHRASE_WORDS)) {
+            return true;
+        }
+        double similarity = diceCoefficient(heard, spoken);
+        return similarity >= ECHO_SIMILARITY_THRESHOLD;
+    }
+
+    private boolean containsSpokenPhrase(String heard, String spoken, int minWords) {
+        String[] words = heard.split(" ");
+        if (words.length < minWords) {
+            return false;
+        }
+        for (int i = 0; i <= words.length - minWords; i++) {
+            StringBuilder phrase = new StringBuilder();
+            for (int j = 0; j < minWords; j++) {
+                if (j > 0) {
+                    phrase.append(' ');
+                }
+                phrase.append(words[i + j]);
+            }
+            if (spoken.contains(phrase.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeForEcho(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text
+                .toLowerCase()
+                .replaceAll("[^a-z0-9\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private double diceCoefficient(String a, String b) {
+        if (a.equals(b)) {
+            return 1.0;
+        }
+        if (a.length() < 2 || b.length() < 2) {
+            return 0.0;
+        }
+        java.util.HashMap<String, Integer> counts = new java.util.HashMap<>();
+        for (int i = 0; i < a.length() - 1; i++) {
+            String gram = a.substring(i, i + 2);
+            counts.put(gram, counts.getOrDefault(gram, 0) + 1);
+        }
+        int overlap = 0;
+        for (int i = 0; i < b.length() - 1; i++) {
+            String gram = b.substring(i, i + 2);
+            Integer count = counts.get(gram);
+            if (count != null && count > 0) {
+                overlap++;
+                counts.put(gram, count - 1);
+            }
+        }
+        int total = (a.length() - 1) + (b.length() - 1);
+        return total == 0 ? 0.0 : (2.0 * overlap) / total;
+    }
+
+    private long estimateSpeechDurationMs(String text) {
+        if (TextUtils.isEmpty(text)) {
+            return TTS_SUPPRESS_MIN_MS;
+        }
+        long estimated = (text.length() * TTS_MS_PER_CHAR) + TTS_SUPPRESS_PADDING_MS;
+        return Math.max(TTS_SUPPRESS_MIN_MS, Math.min(TTS_SUPPRESS_MAX_MS, estimated));
     }
 
     private void updateListeningStatus(String message) {
