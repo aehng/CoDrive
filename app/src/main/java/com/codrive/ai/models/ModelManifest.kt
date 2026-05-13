@@ -41,6 +41,13 @@ object ModelManifest {
         sizeBytes = 200_000L
     )
 
+    val STT_VAD = ModelAsset(
+        fileName = "stt/silero_vad.onnx",
+        downloadUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+        sha256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        sizeBytes = 643_854L
+    )
+
     // --- 3. THE VOICE: Piper Ryan-Low (Fast TTS) ---
     // Ultra-low latency for real-time interaction
     val TTS_MODEL = ModelAsset(
@@ -74,7 +81,7 @@ object ModelManifest {
     )
 
     val voiceRequiredModels = listOf(
-        STT_MODEL, STT_TOKENS,
+        STT_MODEL, STT_TOKENS, STT_VAD,
         TTS_MODEL, TTS_CONFIG, TTS_TOKENS, TTS_ESPEAK_DATA
     )
 
@@ -84,7 +91,7 @@ object ModelManifest {
 
     val allRequiredModels = listOf(
         VLM_LLM, VLM_PROJ,
-        STT_MODEL, STT_TOKENS,
+        STT_MODEL, STT_TOKENS, STT_VAD,
         TTS_MODEL, TTS_CONFIG, TTS_TOKENS, TTS_ESPEAK_DATA
     )
 }

@@ -6,8 +6,10 @@ object ModelReadiness {
     fun hasSttModels(storage: ModelStorage): Boolean {
         return storage.isVerified(ModelManifest.STT_MODEL) &&
             storage.isVerified(ModelManifest.STT_TOKENS) &&
+            storage.isVerified(ModelManifest.STT_VAD) &&
             storage.isValidFile(ModelManifest.STT_MODEL) &&
-            storage.isValidFile(ModelManifest.STT_TOKENS)
+            storage.isValidFile(ModelManifest.STT_TOKENS) &&
+            storage.isValidFile(ModelManifest.STT_VAD)
     }
 
     fun hasTtsModels(storage: ModelStorage): Boolean {

@@ -21,6 +21,7 @@ class SherpaSpeechRecognizer(
 
     override fun start() {
         if (running) {
+            callbacks.onListeningStateChanged("Listening for commands...")
             return
         }
         running = true

@@ -57,6 +57,9 @@
     <string name="settings_screen_title">LLM Settings</string>
     <string name="nav_back">Back</string>
     <string name="settings_llm_section_title">LLM Provider</string>
+    <string name="settings_tab_llm">LLM</string>
+    <string name="settings_tab_voice">Voice</string>
+    <string name="settings_tab_stt">STT Filters</string>
     <string name="chat_you_prefix">You:</string>
     <string name="chat_codrive_prefix">CoDrive:</string>
     <string name="chat_action_prefix">Action:</string>
@@ -101,10 +104,21 @@
     <string name="settings_tts_pitch_hint">1.0</string>
     <string name="settings_stt_tuning_section_title">STT Tuning (Sherpa)</string>
     <string name="settings_stt_threshold_label">Speech threshold (higher = less sensitive)</string>
+    <string name="settings_stt_threshold_help">UI-only speech trigger for visual feedback, not the VAD decision.</string>
+    <string name="settings_stt_vad_threshold_label">VAD threshold (lower = more sensitive)</string>
+    <string name="settings_stt_vad_threshold_help">Lower picks up soft speech; higher resists background radio/noise.</string>
     <string name="settings_stt_min_voiced_label">Minimum voiced duration</string>
+    <string name="settings_stt_min_voiced_help">Lower catches quick words like "home"; higher rejects coughs/grunts.</string>
     <string name="settings_stt_silence_end_label">End-of-speech silence window</string>
+    <string name="settings_stt_silence_end_help">How long to wait after speech before closing the segment.</string>
+    <string name="settings_stt_vad_window_size_label">VAD window size</string>
+    <string name="settings_stt_vad_window_size_help">Smaller is more responsive; larger is smoother but slower to react.</string>
+    <string name="settings_stt_vad_threads_label">VAD threads</string>
+    <string name="settings_stt_vad_threads_help">More threads can reduce latency but uses more CPU/battery.</string>
     <string name="settings_command_delay_label">Command debounce delay (ms)</string>
     <string name="settings_test_voice_button">Test Voice Output</string>
+    <string name="settings_reset_voice_button">Reset Voice Defaults</string>
+    <string name="settings_voice_defaults_reset">Voice settings reset to defaults.</string>
     <string name="settings_barge_in_enabled">Allow interrupt while CoDrive is speaking (Barge-in)</string>
     <string name="settings_speakerphone_preferred">Use speakerphone for voice mode (off = earpiece call style)</string>
     <string name="settings_voice_test_sample">Sherpa voice test. If you can hear this, the engine is working.</string>

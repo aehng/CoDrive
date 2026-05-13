@@ -138,6 +138,14 @@ public class OverlayBubbleService extends Service {
     private static final long TTS_SUPPRESS_MAX_MS = 10000L;
     private static final long TTS_SUPPRESS_PADDING_MS = 300L;
     private static final long TTS_MS_PER_CHAR = 55L;
+    private static final long AUDIO_ROUTE_WATCHDOG_MS = 1500L;
+    private final Runnable audioRouteWatchdogRunnable = new Runnable() {
+        @Override
+        public void run() {
+            ensureCommunicationAudioMode();
+            mainHandler.postDelayed(this, AUDIO_ROUTE_WATCHDOG_MS);
+        }
+    };
     private final Runnable resumeAfterTtsRunnable = new Runnable() {
         @Override
         public void run() {
@@ -238,6 +246,7 @@ public class OverlayBubbleService extends Service {
                 };
         refreshVoiceEngines(true);
         ensureCommunicationAudioMode();
+        mainHandler.postDelayed(audioRouteWatchdogRunnable, AUDIO_ROUTE_WATCHDOG_MS);
         incrementalRequestManager.registerCallback(result -> mainHandler.post(() -> {
             if (sendButton != null) {
                 sendButton.setEnabled(true);
@@ -252,7 +261,7 @@ public class OverlayBubbleService extends Service {
             }
 
             if (isContinuousListeningEnabled()) {
-                updateListeningStatus(getString(R.string.overlay_listening_starting));
+                restartContinuousVoiceMode();
             }
         }));
     }
@@ -291,6 +300,7 @@ public class OverlayBubbleService extends Service {
         if (incrementalRequestManager != null) {
             incrementalRequestManager.endSession();
         }
+        mainHandler.removeCallbacks(audioRouteWatchdogRunnable);
         mainHandler.removeCallbacks(resumeAfterTtsRunnable);
         if (continuousSpeechRecognizer != null) {
             continuousSpeechRecognizer.stop();
@@ -699,6 +709,14 @@ public class OverlayBubbleService extends Service {
         }
         updateListeningStatus(getString(R.string.overlay_listening_starting));
         continuousSpeechRecognizer.start();
+    }
+
+    private void restartContinuousVoiceMode() {
+        if (continuousSpeechRecognizer == null) {
+            return;
+        }
+        continuousSpeechRecognizer.stop();
+        mainHandler.postDelayed(this::startContinuousVoiceMode, 120L);
     }
 
     private void stopContinuousVoiceMode(String statusMessage) {

@@ -56,80 +56,123 @@
             android:paddingTop="8dp"
             android:paddingBottom="16dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/settings_llm_section_title"
-                android:textStyle="bold" />
+                android:orientation="horizontal">
 
-            <TextView
+                <Button
+                    android:id="@+id/settingsTabLlm"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_tab_llm" />
+
+                <Button
+                    android:id="@+id/settingsTabVoice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/settings_tab_voice" />
+
+                <Button
+                    android:id="@+id/settingsTabStt"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/settings_tab_stt" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsLlmSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/settings_provider_label" />
+                android:orientation="vertical">
 
-            <Spinner
-                android:id="@+id/settingsProviderSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_llm_section_title"
+                    android:textStyle="bold" />
 
-            <TextView
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_provider_label" />
+
+                <Spinner
+                    android:id="@+id/settingsProviderSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_api_key_label" />
+
+                <EditText
+                    android:id="@+id/settingsApiKeyInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/settings_api_key_hint"
+                    android:inputType="textPassword" />
+
+                <TextView
+                    android:id="@+id/settingsKeyPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_key_preview_default" />
+
+                <Button
+                    android:id="@+id/settingsLoadModelsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_load_models_button" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_model_list_label" />
+
+                <Spinner
+                    android:id="@+id/settingsModelSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_model_label" />
+
+                <EditText
+                    android:id="@+id/settingsModelInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/settings_model_hint"
+                    android:inputType="text" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsVoiceSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/settings_api_key_label" />
+                android:orientation="vertical">
 
-            <EditText
-                android:id="@+id/settingsApiKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/settings_api_key_hint"
-                android:inputType="textPassword" />
-
-            <TextView
-                android:id="@+id/settingsKeyPreview"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_key_preview_default" />
-
-            <Button
-                android:id="@+id/settingsLoadModelsButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/settings_load_models_button" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/settings_model_list_label" />
-
-            <Spinner
-                android:id="@+id/settingsModelSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/settings_model_label" />
-
-            <EditText
-                android:id="@+id/settingsModelInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/settings_model_hint"
-                android:inputType="text" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/settings_voice_section_title"
-                android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_voice_section_title"
+                    android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -223,18 +266,37 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_test_voice_button" />
 
-            <TextView
+                <Button
+                    android:id="@+id/settingsResetVoiceButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_reset_voice_button" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsSttSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="@string/settings_stt_tuning_section_title"
-                android:textStyle="bold" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_stt_tuning_section_title"
+                    android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_stt_threshold_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_threshold_help"
+                android:textSize="12sp" />
 
             <SeekBar
                 android:id="@+id/settingsSpeechThresholdSeekBar"
@@ -253,7 +315,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:text="@string/settings_stt_vad_threshold_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_vad_threshold_help"
+                android:textSize="12sp" />
+
+            <SeekBar
+                android:id="@+id/settingsVadThresholdSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="70" />
+
+            <TextView
+                android:id="@+id/settingsVadThresholdValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="0.50" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:text="@string/settings_stt_min_voiced_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_min_voiced_help"
+                android:textSize="12sp" />
 
             <SeekBar
                 android:id="@+id/settingsMinVoicedSeekBar"
@@ -273,6 +364,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_stt_silence_end_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_silence_end_help"
+                android:textSize="12sp" />
 
             <SeekBar
                 android:id="@+id/settingsSilenceEndSeekBar"
@@ -290,8 +386,56 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/settings_command_delay_label" />
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_stt_vad_window_size_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_vad_window_size_help"
+                android:textSize="12sp" />
+
+            <SeekBar
+                android:id="@+id/settingsVadWindowSizeSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="768" />
+
+            <TextView
+                android:id="@+id/settingsVadWindowSizeValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="512" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_stt_vad_threads_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_stt_vad_threads_help"
+                android:textSize="12sp" />
+
+            <SeekBar
+                android:id="@+id/settingsVadThreadsSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="3" />
+
+            <TextView
+                android:id="@+id/settingsVadThreadsValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="1" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_command_delay_label" />
 
             <SeekBar
                 android:id="@+id/settingsCommandDelaySeekBar"
@@ -299,12 +443,13 @@
                 android:layout_height="wrap_content"
                 android:max="4900" />
 
-            <TextView
-                android:id="@+id/settingsCommandDelayValue"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="1500 ms" />
+                <TextView
+                    android:id="@+id/settingsCommandDelayValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="1500 ms" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/settingsSaveButton"

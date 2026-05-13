@@ -17,6 +17,9 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
 import com.k2fsa.sherpa.onnx.QnnConfig
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.VadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -42,15 +45,20 @@ class SherpaSttEngine(
             try {
                 val engine = recognizer ?: createRecognizer().also { recognizer = it }
                 val audio = captureAudio()
-                
+
                 // Immediately tell UI that we are done listening and are now thinking
-                onProcessing?.invoke() 
+                onProcessing?.invoke()
+
+                if (audio.isEmpty()) {
+                    onTranscript("")
+                    return@submit
+                }
 
                 val stream = engine.createStream()
                 stream.acceptWaveform(audio, SAMPLE_RATE)
                 engine.decode(stream)
-                val result = engine.getResult(stream)
-                onTranscript(result.text)
+                val rawText = engine.getResult(stream).text.trim()
+                onTranscript(rawText)
             } catch (ex: Exception) {
                 Log.w(TAG, "Sherpa STT failed", ex)
                 onTranscript("")
@@ -87,7 +95,7 @@ class SherpaSttEngine(
 
         val senseVoice = OfflineSenseVoiceModelConfig().apply {
             model = modelPath
-            language = "auto"
+            language = "en"
             useInverseTextNormalization = true
             qnnConfig = QnnConfig()
         }
@@ -114,6 +122,28 @@ class SherpaSttEngine(
         }
 
         return OfflineRecognizer(assetManager = null, config = config)
+    }
+
+    private fun createVad(): Vad {
+        val vadFile = storage.destinationFile(ModelManifest.STT_VAD)
+        if (!vadFile.exists() || vadFile.length() < ModelManifest.STT_VAD.sizeBytes) {
+            throw IllegalStateException("VAD model file invalid: ${vadFile.absolutePath}")
+        }
+
+        val config = VadModelConfig().apply {
+            sileroVadModelConfig = SileroVadModelConfig().apply {
+                model = vadFile.absolutePath
+                threshold = voiceSettingsStore.sttVadThreshold
+                minSilenceDuration = (voiceSettingsStore.sttSilenceEndMs / 1000.0f).coerceIn(0.12f, 1.2f)
+                minSpeechDuration = (voiceSettingsStore.sttMinVoicedMs / 1000.0f).coerceIn(0.08f, 1.0f)
+                windowSize = voiceSettingsStore.sttVadWindowSize
+            }
+            sampleRate = SAMPLE_RATE
+            numThreads = voiceSettingsStore.sttVadNumThreads
+            provider = "cpu"
+            debug = false
+        }
+        return Vad(assetManager = null, config = config)
     }
 
     private fun captureAudio(): FloatArray {
@@ -143,66 +173,50 @@ class SherpaSttEngine(
         }
 
         val buffer = ShortArray(bufferSize / 2)
-        val samples = ArrayList<Short>()
-        var silenceMs = 0L
+        val vad = createVad()
         var sawSpeech = false
-        var voicedMs = 0L
 
-        audioRecord.startRecording()
-        while (running.get()) {
-            val read = audioRecord.read(buffer, 0, buffer.size)
-            if (read <= 0) {
-                continue
-            }
-            var peak = 0
-            for (i in 0 until read) {
-                val sample = buffer[i].toInt()
-                samples.add(buffer[i])
-                val abs = kotlin.math.abs(sample)
-                if (abs > peak) peak = abs
-            }
+        try {
+            audioRecord.startRecording()
+            while (running.get()) {
+                val read = audioRecord.read(buffer, 0, buffer.size)
+                if (read <= 0) {
+                    continue
+                }
 
-            val frameMs = (read * 1000L) / SAMPLE_RATE
-            if (peak > voiceSettingsStore.sttSpeechThreshold) {
-                if (!sawSpeech) {
+                var peak = 0
+                for (i in 0 until read) {
+                    val abs = kotlin.math.abs(buffer[i].toInt())
+                    if (abs > peak) peak = abs
+                }
+                if (peak > voiceSettingsStore.sttSpeechThreshold && !sawSpeech) {
                     sawSpeech = true
                     onSpeechDetected?.invoke()
                 }
-                voicedMs += frameMs
-                silenceMs = 0L
-            } else if (sawSpeech) {
-                silenceMs += frameMs
-                if (silenceMs >= voiceSettingsStore.sttSilenceEndMs.toLong()) {
-                    break
+
+                val floats = FloatArray(read) { idx -> buffer[idx] / 32768.0f }
+                vad.acceptWaveform(floats)
+
+                if (!vad.empty()) {
+                    val segment = vad.front()
+                    val speechSamples = segment.samples
+                    vad.pop()
+                    return speechSamples
                 }
             }
-
-            if (samples.size >= MAX_SAMPLES) {
-                break
-            }
+        } finally {
+            runCatching { audioRecord.stop() }
+            audioRecord.release()
+            runCatching { aec?.release() }
+            runCatching { ns?.release() }
+            runCatching { vad.release() }
         }
 
-        audioRecord.stop()
-        audioRecord.release()
-        runCatching { aec?.release() }
-        runCatching { ns?.release() }
-
-        // Reject short impulsive sounds (cough/click/tap noise) that often decode as garbage tokens.
-        if (!sawSpeech || voicedMs < voiceSettingsStore.sttMinVoicedMs.toLong()) {
-            return floatArrayOf()
-        }
-
-        val floats = FloatArray(samples.size)
-        for (i in samples.indices) {
-            floats[i] = samples[i] / 32768.0f
-        }
-        return floats
+        return floatArrayOf()
     }
 
     companion object {
         private const val TAG = "SherpaSttEngine"
         private const val SAMPLE_RATE = 16000
-        private const val MAX_SECONDS = 12
-        private const val MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS
     }
 }

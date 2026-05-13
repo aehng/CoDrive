@@ -13,8 +13,11 @@ public final class VoiceSettingsStore {
     private static final String KEY_COMMAND_DELAY = "voice_command_delay";
     private static final String KEY_ALLOW_BARGE_IN = "voice_allow_barge_in";
     private static final String KEY_STT_SPEECH_THRESHOLD = "voice_stt_speech_threshold";
+    private static final String KEY_STT_VAD_THRESHOLD = "voice_stt_vad_threshold";
     private static final String KEY_STT_MIN_VOICED_MS = "voice_stt_min_voiced_ms";
     private static final String KEY_STT_SILENCE_END_MS = "voice_stt_silence_end_ms";
+    private static final String KEY_STT_VAD_WINDOW_SIZE = "voice_stt_vad_window_size";
+    private static final String KEY_STT_VAD_NUM_THREADS = "voice_stt_vad_num_threads";
     private static final String KEY_PREFER_SPEAKERPHONE = "voice_prefer_speakerphone";
 
     private static final String DEFAULT_LOCALE = "en-US";
@@ -26,15 +29,24 @@ public final class VoiceSettingsStore {
     private static final String ENGINE_NATIVE = "native";
     private static final String ENGINE_SHERPA = "sherpa";
     private static final boolean DEFAULT_ALLOW_BARGE_IN = false;
-    private static final int DEFAULT_STT_SPEECH_THRESHOLD = 600;
+    private static final int DEFAULT_STT_SPEECH_THRESHOLD = 750;
     private static final int MIN_STT_SPEECH_THRESHOLD = 200;
     private static final int MAX_STT_SPEECH_THRESHOLD = 2000;
-    private static final int DEFAULT_STT_MIN_VOICED_MS = 180;
+    private static final float DEFAULT_STT_VAD_THRESHOLD = 0.5f;
+    private static final float MIN_STT_VAD_THRESHOLD = 0.2f;
+    private static final float MAX_STT_VAD_THRESHOLD = 0.9f;
+    private static final int DEFAULT_STT_MIN_VOICED_MS = 100;
     private static final int MIN_STT_MIN_VOICED_MS = 80;
     private static final int MAX_STT_MIN_VOICED_MS = 800;
-    private static final int DEFAULT_STT_SILENCE_END_MS = 250;
+    private static final int DEFAULT_STT_SILENCE_END_MS = 500;
     private static final int MIN_STT_SILENCE_END_MS = 120;
     private static final int MAX_STT_SILENCE_END_MS = 900;
+    private static final int DEFAULT_STT_VAD_WINDOW_SIZE = 512;
+    private static final int MIN_STT_VAD_WINDOW_SIZE = 256;
+    private static final int MAX_STT_VAD_WINDOW_SIZE = 1024;
+    private static final int DEFAULT_STT_VAD_NUM_THREADS = 1;
+    private static final int MIN_STT_VAD_NUM_THREADS = 1;
+    private static final int MAX_STT_VAD_NUM_THREADS = 4;
     private static final boolean DEFAULT_PREFER_SPEAKERPHONE = true;
 
     private final SharedPreferences prefs;
@@ -110,6 +122,17 @@ public final class VoiceSettingsStore {
             .apply();
     }
 
+    public float getSttVadThreshold() {
+        float value = prefs.getFloat(KEY_STT_VAD_THRESHOLD, DEFAULT_STT_VAD_THRESHOLD);
+        return clamp(value, MIN_STT_VAD_THRESHOLD, MAX_STT_VAD_THRESHOLD);
+    }
+
+    public void setSttVadThreshold(float threshold) {
+        prefs.edit()
+            .putFloat(KEY_STT_VAD_THRESHOLD, clamp(threshold, MIN_STT_VAD_THRESHOLD, MAX_STT_VAD_THRESHOLD))
+            .apply();
+    }
+
     public int getSttMinVoicedMs() {
         int value = prefs.getInt(KEY_STT_MIN_VOICED_MS, DEFAULT_STT_MIN_VOICED_MS);
         return clampInt(value, MIN_STT_MIN_VOICED_MS, MAX_STT_MIN_VOICED_MS);
@@ -132,12 +155,53 @@ public final class VoiceSettingsStore {
             .apply();
     }
 
+    public int getSttVadWindowSize() {
+        int value = prefs.getInt(KEY_STT_VAD_WINDOW_SIZE, DEFAULT_STT_VAD_WINDOW_SIZE);
+        return clampInt(value, MIN_STT_VAD_WINDOW_SIZE, MAX_STT_VAD_WINDOW_SIZE);
+    }
+
+    public void setSttVadWindowSize(int windowSize) {
+        prefs.edit()
+            .putInt(KEY_STT_VAD_WINDOW_SIZE, clampInt(windowSize, MIN_STT_VAD_WINDOW_SIZE, MAX_STT_VAD_WINDOW_SIZE))
+            .apply();
+    }
+
+    public int getSttVadNumThreads() {
+        int value = prefs.getInt(KEY_STT_VAD_NUM_THREADS, DEFAULT_STT_VAD_NUM_THREADS);
+        return clampInt(value, MIN_STT_VAD_NUM_THREADS, MAX_STT_VAD_NUM_THREADS);
+    }
+
+    public void setSttVadNumThreads(int numThreads) {
+        prefs.edit()
+            .putInt(KEY_STT_VAD_NUM_THREADS, clampInt(numThreads, MIN_STT_VAD_NUM_THREADS, MAX_STT_VAD_NUM_THREADS))
+            .apply();
+    }
+
     public boolean isPreferSpeakerphone() {
         return prefs.getBoolean(KEY_PREFER_SPEAKERPHONE, DEFAULT_PREFER_SPEAKERPHONE);
     }
 
     public void setPreferSpeakerphone(boolean preferSpeakerphone) {
         prefs.edit().putBoolean(KEY_PREFER_SPEAKERPHONE, preferSpeakerphone).apply();
+    }
+
+    public void resetVoiceSettings() {
+        prefs.edit()
+            .putString(KEY_STT_LOCALE, DEFAULT_LOCALE)
+            .putString(KEY_TTS_LOCALE, DEFAULT_LOCALE)
+            .putFloat(KEY_TTS_RATE, DEFAULT_RATE)
+            .putFloat(KEY_TTS_PITCH, DEFAULT_PITCH)
+            .putString(KEY_VOICE_ENGINE, ENGINE_SHERPA)
+            .putLong(KEY_COMMAND_DELAY, DEFAULT_COMMAND_DELAY)
+            .putBoolean(KEY_ALLOW_BARGE_IN, DEFAULT_ALLOW_BARGE_IN)
+            .putInt(KEY_STT_SPEECH_THRESHOLD, DEFAULT_STT_SPEECH_THRESHOLD)
+            .putFloat(KEY_STT_VAD_THRESHOLD, DEFAULT_STT_VAD_THRESHOLD)
+            .putInt(KEY_STT_MIN_VOICED_MS, DEFAULT_STT_MIN_VOICED_MS)
+            .putInt(KEY_STT_SILENCE_END_MS, DEFAULT_STT_SILENCE_END_MS)
+            .putInt(KEY_STT_VAD_WINDOW_SIZE, DEFAULT_STT_VAD_WINDOW_SIZE)
+            .putInt(KEY_STT_VAD_NUM_THREADS, DEFAULT_STT_VAD_NUM_THREADS)
+            .putBoolean(KEY_PREFER_SPEAKERPHONE, DEFAULT_PREFER_SPEAKERPHONE)
+            .apply();
     }
 
     private static String sanitizeLocaleTag(String tag) {

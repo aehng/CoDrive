@@ -14,6 +14,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -62,10 +63,19 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView commandDelayValueText;
     private SeekBar speechThresholdSeekBar;
     private TextView speechThresholdValueText;
+    private SeekBar vadThresholdSeekBar;
+    private TextView vadThresholdValueText;
     private SeekBar minVoicedSeekBar;
     private TextView minVoicedValueText;
     private SeekBar silenceEndSeekBar;
     private TextView silenceEndValueText;
+    private SeekBar vadWindowSizeSeekBar;
+    private TextView vadWindowSizeValueText;
+    private SeekBar vadThreadsSeekBar;
+    private TextView vadThreadsValueText;
+    private LinearLayout llmSection;
+    private LinearLayout voiceSection;
+    private LinearLayout sttSection;
     private TtsEngine testTtsEngine;
     private LlmSettingsStore settingsStore;
     private VoiceSettingsStore voiceSettingsStore;
@@ -85,8 +95,12 @@ public class SettingsActivity extends AppCompatActivity {
     private static final float TTS_PITCH_MAX = 1.3f;
     private static final float TTS_PITCH_STEP = 0.01f;
     private static final int STT_SPEECH_THRESHOLD_MIN = 200;
+    private static final float STT_VAD_THRESHOLD_MIN = 0.2f;
+    private static final float STT_VAD_THRESHOLD_STEP = 0.01f;
     private static final int STT_MIN_VOICED_MIN = 80;
     private static final int STT_SILENCE_END_MIN = 120;
+    private static final int STT_VAD_WINDOW_SIZE_MIN = 256;
+    private static final int STT_VAD_THREADS_MIN = 1;
     private static final String TAG = "SettingsActivity";
 
     @Override
@@ -117,13 +131,26 @@ public class SettingsActivity extends AppCompatActivity {
         commandDelayValueText = findViewById(R.id.settingsCommandDelayValue);
         speechThresholdSeekBar = findViewById(R.id.settingsSpeechThresholdSeekBar);
         speechThresholdValueText = findViewById(R.id.settingsSpeechThresholdValue);
+        vadThresholdSeekBar = findViewById(R.id.settingsVadThresholdSeekBar);
+        vadThresholdValueText = findViewById(R.id.settingsVadThresholdValue);
         minVoicedSeekBar = findViewById(R.id.settingsMinVoicedSeekBar);
         minVoicedValueText = findViewById(R.id.settingsMinVoicedValue);
         silenceEndSeekBar = findViewById(R.id.settingsSilenceEndSeekBar);
         silenceEndValueText = findViewById(R.id.settingsSilenceEndValue);
+        vadWindowSizeSeekBar = findViewById(R.id.settingsVadWindowSizeSeekBar);
+        vadWindowSizeValueText = findViewById(R.id.settingsVadWindowSizeValue);
+        vadThreadsSeekBar = findViewById(R.id.settingsVadThreadsSeekBar);
+        vadThreadsValueText = findViewById(R.id.settingsVadThreadsValue);
+        llmSection = findViewById(R.id.settingsLlmSection);
+        voiceSection = findViewById(R.id.settingsVoiceSection);
+        sttSection = findViewById(R.id.settingsSttSection);
         Button loadModelsButton = findViewById(R.id.settingsLoadModelsButton);
         Button saveButton = findViewById(R.id.settingsSaveButton);
         Button testVoiceButton = findViewById(R.id.settingsTestVoiceButton);
+        Button resetVoiceButton = findViewById(R.id.settingsResetVoiceButton);
+        Button llmTabButton = findViewById(R.id.settingsTabLlm);
+        Button voiceTabButton = findViewById(R.id.settingsTabVoice);
+        Button sttTabButton = findViewById(R.id.settingsTabStt);
         ImageButton menuButton = findViewById(R.id.settingsMenuButton);
         ImageButton backButton = findViewById(R.id.settingsBackButton);
 
@@ -190,6 +217,10 @@ public class SettingsActivity extends AppCompatActivity {
         saveButton.setOnClickListener(v -> saveSettings());
         loadModelsButton.setOnClickListener(v -> loadModelsForProvider());
         testVoiceButton.setOnClickListener(v -> testVoiceOutput());
+        resetVoiceButton.setOnClickListener(v -> resetVoiceDefaults());
+        llmTabButton.setOnClickListener(v -> showSettingsSection(SettingsSection.LLM));
+        voiceTabButton.setOnClickListener(v -> showSettingsSection(SettingsSection.VOICE));
+        sttTabButton.setOnClickListener(v -> showSettingsSection(SettingsSection.STT));
 
         ttsRateSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -235,6 +266,10 @@ public class SettingsActivity extends AppCompatActivity {
                 speechThresholdValueText.setText(String.valueOf(progress + STT_SPEECH_THRESHOLD_MIN))
         ));
 
+        vadThresholdSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                vadThresholdValueText.setText(String.format(Locale.US, "%.2f", getVadThresholdFromSeekBar()))
+        ));
+
         minVoicedSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
                 minVoicedValueText.setText((progress + STT_MIN_VOICED_MIN) + " ms")
         ));
@@ -242,6 +277,14 @@ public class SettingsActivity extends AppCompatActivity {
         silenceEndSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
                 silenceEndValueText.setText((progress + STT_SILENCE_END_MIN) + " ms")
         ));
+        vadWindowSizeSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                vadWindowSizeValueText.setText(String.valueOf(progress + STT_VAD_WINDOW_SIZE_MIN))
+        ));
+        vadThreadsSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                vadThreadsValueText.setText(String.valueOf(progress + STT_VAD_THREADS_MIN))
+        ));
+
+        showSettingsSection(SettingsSection.LLM);
 
     }
 
@@ -275,12 +318,21 @@ public class SettingsActivity extends AppCompatActivity {
         int speechThreshold = voiceSettingsStore.getSttSpeechThreshold();
         speechThresholdSeekBar.setProgress(speechThreshold - STT_SPEECH_THRESHOLD_MIN);
         speechThresholdValueText.setText(String.valueOf(speechThreshold));
+        float vadThreshold = voiceSettingsStore.getSttVadThreshold();
+        vadThresholdSeekBar.setProgress(progressForVadThreshold(vadThreshold));
+        vadThresholdValueText.setText(String.format(Locale.US, "%.2f", vadThreshold));
         int minVoiced = voiceSettingsStore.getSttMinVoicedMs();
         minVoicedSeekBar.setProgress(minVoiced - STT_MIN_VOICED_MIN);
         minVoicedValueText.setText(minVoiced + " ms");
         int silenceEnd = voiceSettingsStore.getSttSilenceEndMs();
         silenceEndSeekBar.setProgress(silenceEnd - STT_SILENCE_END_MIN);
         silenceEndValueText.setText(silenceEnd + " ms");
+        int vadWindowSize = voiceSettingsStore.getSttVadWindowSize();
+        vadWindowSizeSeekBar.setProgress(vadWindowSize - STT_VAD_WINDOW_SIZE_MIN);
+        vadWindowSizeValueText.setText(String.valueOf(vadWindowSize));
+        int vadThreads = voiceSettingsStore.getSttVadNumThreads();
+        vadThreadsSeekBar.setProgress(vadThreads - STT_VAD_THREADS_MIN);
+        vadThreadsValueText.setText(String.valueOf(vadThreads));
     }
 
     private void saveSettings() {
@@ -299,8 +351,11 @@ public class SettingsActivity extends AppCompatActivity {
         voiceSettingsStore.setPreferSpeakerphone(speakerphonePreferredCheckbox.isChecked());
         voiceSettingsStore.setCommandDelayMs(commandDelaySeekBar.getProgress() + COMMAND_DELAY_MIN_MS);
         voiceSettingsStore.setSttSpeechThreshold(speechThresholdSeekBar.getProgress() + STT_SPEECH_THRESHOLD_MIN);
+        voiceSettingsStore.setSttVadThreshold(getVadThresholdFromSeekBar());
         voiceSettingsStore.setSttMinVoicedMs(minVoicedSeekBar.getProgress() + STT_MIN_VOICED_MIN);
         voiceSettingsStore.setSttSilenceEndMs(silenceEndSeekBar.getProgress() + STT_SILENCE_END_MIN);
+        voiceSettingsStore.setSttVadWindowSize(vadWindowSizeSeekBar.getProgress() + STT_VAD_WINDOW_SIZE_MIN);
+        voiceSettingsStore.setSttVadNumThreads(vadThreadsSeekBar.getProgress() + STT_VAD_THREADS_MIN);
 
         settingsStore.saveProviderAndModel(provider, model);
         if (!TextUtils.isEmpty(enteredKey)) {
@@ -547,6 +602,12 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    private void resetVoiceDefaults() {
+        voiceSettingsStore.resetVoiceSettings();
+        loadCurrentSettings();
+        statusText.setText(R.string.settings_voice_defaults_reset);
+    }
+
     private float getTtsRateFromSeekBar() {
         return TTS_RATE_MIN + (ttsRateSeekBar.getProgress() * TTS_RATE_STEP);
     }
@@ -554,6 +615,15 @@ public class SettingsActivity extends AppCompatActivity {
     private int progressForRate(float rate) {
         float clamped = Math.max(TTS_RATE_MIN, Math.min(TTS_RATE_MAX, rate));
         return Math.round((clamped - TTS_RATE_MIN) / TTS_RATE_STEP);
+    }
+
+    private float getVadThresholdFromSeekBar() {
+        return STT_VAD_THRESHOLD_MIN + (vadThresholdSeekBar.getProgress() * STT_VAD_THRESHOLD_STEP);
+    }
+
+    private int progressForVadThreshold(float threshold) {
+        float clamped = Math.max(STT_VAD_THRESHOLD_MIN, Math.min(0.9f, threshold));
+        return Math.round((clamped - STT_VAD_THRESHOLD_MIN) / STT_VAD_THRESHOLD_STEP);
     }
 
     private float getTtsPitchFromSeekBar() {
@@ -590,6 +660,18 @@ public class SettingsActivity extends AppCompatActivity {
 
     private interface ProgressChanged {
         void run(int progress);
+    }
+
+    private void showSettingsSection(SettingsSection section) {
+        llmSection.setVisibility(section == SettingsSection.LLM ? View.VISIBLE : View.GONE);
+        voiceSection.setVisibility(section == SettingsSection.VOICE ? View.VISIBLE : View.GONE);
+        sttSection.setVisibility(section == SettingsSection.STT ? View.VISIBLE : View.GONE);
+    }
+
+    private enum SettingsSection {
+        LLM,
+        VOICE,
+        STT
     }
 
     private boolean onNavigationItemClicked(MenuItem item) {
