@@ -5,8 +5,11 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
+import android.media.AudioFocusRequest;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -112,9 +115,16 @@ public class OverlayBubbleService extends Service {
     private boolean commAudioModeApplied = false;
     private int previousAudioMode = AudioManager.MODE_NORMAL;
     private boolean previousSpeakerphoneOn = false;
+    private AudioFocusRequest audioFocusRequest;
+    private final AudioManager.OnAudioFocusChangeListener audioFocusChangeListener = focusChange -> {
+        if (focusChange == AudioManager.AUDIOFOCUS_LOSS
+                || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            audioFocusGranted = false;
+        }
+    };
+    private boolean audioFocusGranted = false;
     private boolean routeToSpeaker = true;
     private String lastAssistantSpokenNormalized = "";
-    private long lastAssistantSpokenAtMs = 0L;
     private final Runnable autoSubmitRunnable = new Runnable() {
         @Override
         public void run() {
@@ -131,9 +141,8 @@ public class OverlayBubbleService extends Service {
     };
     private static final long PARTIAL_IDLE_MS = 300L;
     private static final long BARGE_IN_COMMAND_DELAY_MS = 1200L;
-    private static final long ECHO_FILTER_WINDOW_MS = 15000L;
     private static final double ECHO_SIMILARITY_THRESHOLD = 0.72;
-    private static final int ECHO_MIN_PHRASE_WORDS = 2;
+    private static final int ECHO_MIN_ORDERED_COMMON_WORDS = 3;
     private static final long TTS_SUPPRESS_MIN_MS = 1200L;
     private static final long TTS_SUPPRESS_MAX_MS = 10000L;
     private static final long TTS_SUPPRESS_PADDING_MS = 300L;
@@ -189,6 +198,7 @@ public class OverlayBubbleService extends Service {
                         if (micSuppressedForTts) {
                             return;
                         }
+                        mainHandler.post(() -> clearLiveTranscript());
                         mainHandler.post(() -> updateListeningStatus(getString(R.string.overlay_listening_speech_detected)));
                     }
 
@@ -750,14 +760,9 @@ public class OverlayBubbleService extends Service {
 
     private void rememberAssistantSpeech(String text) {
         lastAssistantSpokenNormalized = normalizeForEcho(text);
-        lastAssistantSpokenAtMs = System.currentTimeMillis();
     }
 
     private boolean shouldDropAsEcho(String recognized) {
-        long ageMs = System.currentTimeMillis() - lastAssistantSpokenAtMs;
-        if (ageMs < 0 || ageMs > ECHO_FILTER_WINDOW_MS) {
-            return false;
-        }
         String heard = normalizeForEcho(recognized);
         String spoken = lastAssistantSpokenNormalized;
         if (heard.isEmpty() || spoken.isEmpty()) {
@@ -766,31 +771,30 @@ public class OverlayBubbleService extends Service {
         if (spoken.contains(heard) || heard.contains(spoken)) {
             return true;
         }
-        if (containsSpokenPhrase(heard, spoken, ECHO_MIN_PHRASE_WORDS)) {
+        if (hasOrderedWordOverlap(heard, spoken, ECHO_MIN_ORDERED_COMMON_WORDS)) {
             return true;
         }
         double similarity = diceCoefficient(heard, spoken);
         return similarity >= ECHO_SIMILARITY_THRESHOLD;
     }
 
-    private boolean containsSpokenPhrase(String heard, String spoken, int minWords) {
-        String[] words = heard.split(" ");
-        if (words.length < minWords) {
+    private boolean hasOrderedWordOverlap(String heard, String spoken, int minWords) {
+        String[] heardWords = heard.split(" ");
+        String[] spokenWords = spoken.split(" ");
+        if (heardWords.length < minWords || spokenWords.length < minWords) {
             return false;
         }
-        for (int i = 0; i <= words.length - minWords; i++) {
-            StringBuilder phrase = new StringBuilder();
-            for (int j = 0; j < minWords; j++) {
-                if (j > 0) {
-                    phrase.append(' ');
+        int[][] lcs = new int[heardWords.length + 1][spokenWords.length + 1];
+        for (int i = heardWords.length - 1; i >= 0; i--) {
+            for (int j = spokenWords.length - 1; j >= 0; j--) {
+                if (heardWords[i].equals(spokenWords[j])) {
+                    lcs[i][j] = 1 + lcs[i + 1][j + 1];
+                } else {
+                    lcs[i][j] = Math.max(lcs[i + 1][j], lcs[i][j + 1]);
                 }
-                phrase.append(words[i + j]);
-            }
-            if (spoken.contains(phrase.toString())) {
-                return true;
             }
         }
-        return false;
+        return lcs[0][0] >= minWords;
     }
 
     private String normalizeForEcho(String text) {
@@ -922,6 +926,7 @@ public class OverlayBubbleService extends Service {
             return;
         }
         try {
+            requestVoiceAudioFocusIfNeeded();
             if (!commAudioModeApplied) {
                 previousAudioMode = audioManager.getMode();
                 previousSpeakerphoneOn = audioManager.isSpeakerphoneOn();
@@ -929,6 +934,7 @@ public class OverlayBubbleService extends Service {
                 commAudioModeApplied = true;
                 Log.d(TAG, "Applied communication audio mode for full-duplex voice.");
             }
+            // Force loudspeaker for overlay assistant responses in communication mode.
             audioManager.setSpeakerphoneOn(routeToSpeaker);
         } catch (Exception ex) {
             Log.w(TAG, "Failed to apply communication audio mode", ex);
@@ -936,18 +942,64 @@ public class OverlayBubbleService extends Service {
     }
 
     private void restoreAudioMode() {
-        if (audioManager == null || !commAudioModeApplied) {
+        if (audioManager == null) {
             return;
         }
         try {
-            audioManager.setSpeakerphoneOn(previousSpeakerphoneOn);
-            audioManager.setMode(previousAudioMode);
-            Log.d(TAG, "Restored previous audio mode.");
+            // Explicit teardown for call-like session lifecycle.
+            audioManager.setSpeakerphoneOn(false);
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            Log.d(TAG, "Restored MODE_NORMAL and speakerphone off.");
         } catch (Exception ex) {
             Log.w(TAG, "Failed to restore previous audio mode", ex);
         } finally {
             commAudioModeApplied = false;
+            abandonVoiceAudioFocusIfNeeded();
         }
+    }
+
+    private void requestVoiceAudioFocusIfNeeded() {
+        if (audioManager == null || audioFocusGranted) {
+            return;
+        }
+        int result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest == null) {
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build())
+                        .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                        .build();
+            }
+            result = audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            result = audioManager.requestAudioFocus(
+                    audioFocusChangeListener,
+                    AudioManager.STREAM_VOICE_CALL,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+            );
+        }
+        audioFocusGranted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        Log.d(TAG, "Audio focus request result=" + result + " granted=" + audioFocusGranted);
+    }
+
+    private void abandonVoiceAudioFocusIfNeeded() {
+        if (audioManager == null || !audioFocusGranted) {
+            return;
+        }
+        final int result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest == null) {
+                return;
+            }
+            result = audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        } else {
+            result = audioManager.abandonAudioFocus(audioFocusChangeListener);
+        }
+        audioFocusGranted = false;
+        Log.d(TAG, "Audio focus abandoned result=" + result);
     }
 
     private void detachOverlay() {

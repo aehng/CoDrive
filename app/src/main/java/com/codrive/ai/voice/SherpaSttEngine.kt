@@ -161,6 +161,7 @@ class SherpaSttEngine(
             bufferSize
         )
         val sessionId = audioRecord.audioSessionId
+        VoiceAudioSessionLink.setSttAudioSessionId(sessionId)
         val aec = if (AcousticEchoCanceler.isAvailable()) {
             runCatching { AcousticEchoCanceler.create(sessionId) }.getOrNull()?.apply { enabled = true }
         } else {

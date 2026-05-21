@@ -26,7 +26,10 @@ class SherpaTtsEngine(
 ) : TtsEngine {
     private val executor = Executors.newSingleThreadExecutor()
     private var tts: OfflineTts? = null
+    private val audioTrackLock = Any()
     private var audioTrack: AudioTrack? = null
+    @Volatile
+    private var stopRequested = false
 
     override fun speak(message: String) {
         val text = message.trim()
@@ -37,6 +40,7 @@ class SherpaTtsEngine(
         Log.d(TAG, "speak queued: chars=${text.length}")
         executor.submit {
             try {
+                stopRequested = false
                 Log.d(TAG, "speak started")
                 val engine = tts ?: createTts().also { tts = it }
                 Log.d(TAG, "generating audio")
@@ -54,9 +58,15 @@ class SherpaTtsEngine(
     }
 
     override fun stop() {
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
+        stopRequested = true
+        synchronized(audioTrackLock) {
+            val track = audioTrack ?: return
+            runCatching { track.pause() }
+            runCatching { track.flush() }
+            runCatching { track.stop() }
+            runCatching { track.release() }
+            audioTrack = null
+        }
     }
 
     fun shutdown() {
@@ -157,12 +167,14 @@ class SherpaTtsEngine(
             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
             .build()
 
+        val sessionId = VoiceAudioSessionLink.getLinkedAudioSessionIdOrNull()
+            ?: AudioManager.AUDIO_SESSION_ID_GENERATE
         val track = AudioTrack(
             attributes,
             format,
             shorts.size * 2,
             AudioTrack.MODE_STATIC,
-            AudioManager.AUDIO_SESSION_ID_GENERATE
+            sessionId
         )
         val writeResult = track.write(shorts, 0, shorts.size)
         Log.d(
@@ -174,8 +186,10 @@ class SherpaTtsEngine(
             throw IllegalStateException("AudioTrack not initialized; state=${track.state}")
         }
         track.play()
-        audioTrack?.release()
-        audioTrack = track
+        synchronized(audioTrackLock) {
+            audioTrack?.release()
+            audioTrack = track
+        }
     }
 
     private fun waitForPlaybackToFinish(audio: GeneratedAudio) {
@@ -183,12 +197,20 @@ class SherpaTtsEngine(
             return
         }
         val durationMs = ceil((audio.samples.size.toDouble() / audio.sampleRate.toDouble()) * 1000.0).toLong()
-        val waitMs = (durationMs + 120L).coerceAtMost(15_000L)
-        Log.d(TAG, "waiting for playback completion: ${waitMs}ms")
-        try {
-            Thread.sleep(waitMs)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        val deadlineMs = System.currentTimeMillis() + (durationMs + 120L).coerceAtMost(15_000L)
+        Log.d(TAG, "waiting for playback completion until=${deadlineMs}")
+        while (!stopRequested && System.currentTimeMillis() < deadlineMs) {
+            val track = synchronized(audioTrackLock) { audioTrack } ?: return
+            val isPlaying = runCatching { track.playState == AudioTrack.PLAYSTATE_PLAYING }.getOrElse { false }
+            if (!isPlaying) {
+                return
+            }
+            try {
+                Thread.sleep(30L)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
         }
     }
 
