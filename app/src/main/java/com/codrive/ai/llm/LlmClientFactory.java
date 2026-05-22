@@ -12,6 +12,28 @@ public final class LlmClientFactory {
     }
 
     public static LlmClient create(LlmSettingsStore settingsStore) {
+        if (settingsStore.isDualRoutingEnabled()) {
+            String groqKey = settingsStore.getApiKeyFor(LlmProvider.GROQ);
+            String geminiKey = settingsStore.getApiKeyFor(LlmProvider.GEMINI);
+            if (!groqKey.isEmpty() && !geminiKey.isEmpty()) {
+                LlmClient groqClient = createFor(
+                        LlmProvider.GROQ,
+                        settingsStore.getModelFor(LlmProvider.GROQ),
+                        groqKey
+                );
+                LlmClient geminiClient = createFor(
+                        LlmProvider.GEMINI,
+                        settingsStore.getModelFor(LlmProvider.GEMINI),
+                        geminiKey
+                );
+                return new DualRoutingLlmClient(
+                        groqClient,
+                        geminiClient,
+                        settingsStore.getDualRoutingGroqPercent()
+                );
+            }
+        }
+
         LlmProvider provider = settingsStore.getProvider();
         return createFor(
                 provider,

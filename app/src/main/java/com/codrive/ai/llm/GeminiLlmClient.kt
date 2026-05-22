@@ -34,7 +34,7 @@ class GeminiLlmClient @JvmOverloads constructor(
     private val model: String,
     private val parser: GroqDecisionParser = GroqDecisionParser(),
     private val transport: GeminiTransport = defaultTransportWithQueryKey(apiKey, model),
-    private val fallbackTransportFactory: (String, String) -> GeminiTransport = ::defaultTransport,
+    private val fallbackTransportFactory: (String, String) -> GeminiTransport = ::defaultTransportWithHeaderKey,
     private val sleeper: (Long) -> Unit = { Thread.sleep(it) },
     private val jitterProvider: () -> Long = { Random.nextLong(0, 250) },
 ) : LlmClient {
@@ -76,9 +76,9 @@ class GeminiLlmClient @JvmOverloads constructor(
                         return parseGeminiResponse(responseBody)
                     }
 
-                    // If auth is rejected, try the query-key fallback once before failing.
+                    // If auth is rejected, try the x-goog-api-key header transport once before failing.
                     if ((statusCode == 401 || statusCode == 403) && attempt == 0) {
-                        logIfDebug("CoDrive.Gemini", "Auth rejected, attempting query-key fallback (no key logged)")
+                        logIfDebug("CoDrive.Gemini", "Auth rejected, attempting x-goog-api-key header fallback (no key logged)")
                         try {
                             val fallbackCall = fallbackTransportFactory(apiKey, model).postCall(requestBody, AgentPolicy.groqRequestTimeoutMillis.toInt())
                             activeCall = fallbackCall
@@ -185,13 +185,18 @@ class GeminiLlmClient @JvmOverloads constructor(
 
             Mandatory Schema (must be valid JSON exactly):
             {
-              "action_type": "CLICK|TYPE|SCROLL|HOME|BACK|RECENTS|SEARCH_MEMORY|RESPOND|FINISH",
+              "action_type": "CLICK|TYPE|SCROLL|HOME|BACK|RECENTS|OPEN_NOTIFICATIONS|OPEN_QUICK_SETTINGS|OPEN_POWER_DIALOG|LOCK_SCREEN|TAKE_SCREENSHOT|SWIPE_DOWN|SWIPE_UP|SWIPE_LEFT|SWIPE_RIGHT|SEARCH_MEMORY|RESPOND|FINISH",
               "target_index": 0,
               "text_to_type": "",
               "tool_query": "",
               "voice_feedback": "",
               "confidence_score": 0.0
             }
+
+            Rules:
+            - If action_type is RESPOND or a global/system gesture action, set target_index to 0.
+            - If action_type is CLICK/TYPE/SCROLL, use a valid index from ui_map for target_index.
+            - Prefer SWIPE_UP/SWIPE_DOWN/SWIPE_LEFT/SWIPE_RIGHT for viewport movement gestures.
 
             UI MAP LEGEND:
             Each entry in ui_map is a 4-item tuple: [index:int, role:char, [center_x:int, center_y:int], text:string]
@@ -313,7 +318,7 @@ class GeminiLlmClient @JvmOverloads constructor(
             return "$GEMINI_BASE_URL/$safeModel:generateContent"
         }
 
-        fun defaultTransport(apiKey: String, model: String): GeminiTransport = GeminiTransport { requestBody, timeoutMillis ->
+        fun defaultTransportWithHeaderKey(apiKey: String, model: String): GeminiTransport = GeminiTransport { requestBody, timeoutMillis ->
             val client = OkHttpClient.Builder()
                 .callTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
                 .build()
@@ -325,7 +330,7 @@ class GeminiLlmClient @JvmOverloads constructor(
                 .url(buildGenerateContentUrl(model))
                 .post(body)
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer $apiKey")
+                .header("x-goog-api-key", apiKey)
                 .build()
 
             client.newCall(request)
@@ -359,7 +364,7 @@ class GeminiLlmClient @JvmOverloads constructor(
             model: String,
             timeoutMillis: Int = 6_000,
             transportFactory: (String, String) -> GeminiTransport = ::defaultTransportWithQueryKey,
-            fallbackFactory: (String, String) -> GeminiTransport = ::defaultTransport,
+            fallbackFactory: (String, String) -> GeminiTransport = ::defaultTransportWithHeaderKey,
         ): Pair<Boolean, String> {
             fun sanitizeForLogs(raw: String?): String {
                 if (raw == null) return ""

@@ -57,6 +57,16 @@
     <string name="settings_screen_title">LLM Settings</string>
     <string name="nav_back">Back</string>
     <string name="settings_llm_section_title">LLM Provider</string>
+    <string name="settings_agentic_section_title">Beta Agentic Mode</string>
+    <string name="settings_agentic_enabled">Enable multi-step agentic execution (beta)</string>
+    <string name="settings_agentic_iterations_label">Max agentic iterations (1-10)</string>
+    <string name="settings_history_enabled">Include conversation history in prompts</string>
+    <string name="settings_history_depth_label">History depth (previous responses, 0-20)</string>
+    <string name="settings_history_none">None</string>
+    <string name="settings_dual_routing_section_title">Dual Provider Routing (Beta)</string>
+    <string name="settings_dual_routing_enabled">Alternate between Groq and Gemini for LLM calls</string>
+    <string name="settings_dual_routing_ratio_label">Groq share (Gemini gets the remainder)</string>
+    <string name="settings_dual_routing_ratio_format">Groq %1$d%% / Gemini %2$d%%</string>
     <string name="settings_tab_llm">LLM</string>
     <string name="settings_tab_voice">Voice</string>
     <string name="settings_tab_stt">STT Filters</string>

@@ -6,6 +6,8 @@ import com.codrive.ai.model.AgentPolicy
 
 class ActiveSessionManager @JvmOverloads constructor(
     private val timeoutMillis: Long = AgentPolicy.activeSessionTimeoutMillis,
+    private val historyEnabled: Boolean = true,
+    private val historyDepth: Int = DEFAULT_HISTORY_DEPTH,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) {
     private val history = mutableListOf<SessionMessage>()
@@ -14,6 +16,10 @@ class ActiveSessionManager @JvmOverloads constructor(
     @Synchronized
     fun beginTurn(userInput: String): String {
         val normalized = userInput.trim()
+        if (!historyEnabled || historyDepth <= 0) {
+            clear()
+            return normalized
+        }
         val now = nowProvider()
         expireIfNeeded(now)
 
@@ -30,6 +36,10 @@ class ActiveSessionManager @JvmOverloads constructor(
 
     @Synchronized
     fun onDecision(decision: AgentDecision, didExecute: Boolean) {
+        if (!historyEnabled || historyDepth <= 0) {
+            clear()
+            return
+        }
         val now = nowProvider()
         expireIfNeeded(now)
 
@@ -83,7 +93,12 @@ class ActiveSessionManager @JvmOverloads constructor(
     }
 
     private fun trimHistoryIfNeeded() {
-        val overflow = history.size - MAX_HISTORY_MESSAGES
+        val maxMessages = historyDepth * 2
+        if (maxMessages <= 0) {
+            history.clear()
+            return
+        }
+        val overflow = history.size - maxMessages
         if (overflow > 0) {
             repeat(overflow) { history.removeAt(0) }
         }
@@ -106,7 +121,7 @@ class ActiveSessionManager @JvmOverloads constructor(
     )
 
     companion object {
-        private const val MAX_HISTORY_MESSAGES = 8
+        private const val DEFAULT_HISTORY_DEPTH = 4
     }
 }
 

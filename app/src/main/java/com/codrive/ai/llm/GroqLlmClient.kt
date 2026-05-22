@@ -134,7 +134,7 @@ class GroqLlmClient(
 
             Mandatory Schema (must be valid JSON exactly):
             {
-              "action_type": "CLICK|TYPE|SCROLL|HOME|BACK|RECENTS|SEARCH_MEMORY|RESPOND|FINISH",
+              "action_type": "CLICK|TYPE|SCROLL|HOME|BACK|RECENTS|OPEN_NOTIFICATIONS|OPEN_QUICK_SETTINGS|OPEN_POWER_DIALOG|LOCK_SCREEN|TAKE_SCREENSHOT|SWIPE_DOWN|SWIPE_UP|SWIPE_LEFT|SWIPE_RIGHT|SEARCH_MEMORY|RESPOND|FINISH",
               "target_index": 0,
               "text_to_type": "",
               "tool_query": "",
@@ -143,8 +143,9 @@ class GroqLlmClient(
             }
 
             Rules:
-            - If action_type is RESPOND or a system navigation (HOME/BACK), target_index must be 0.
+            - If action_type is RESPOND or a global/system gesture action, target_index must be 0.
             - If action_type is CLICK/TYPE/SCROLL, use a valid index from ui_map for target_index. For TYPE, supply text_to_type. For SEARCH_MEMORY, supply tool_query.
+            - Prefer SWIPE_UP/SWIPE_DOWN/SWIPE_LEFT/SWIPE_RIGHT for viewport movement gestures.
 
             UI MAP LEGEND:
             Each entry in ui_map is a 4-item tuple: [index:int, role:char, [center_x:int, center_y:int], text:string]

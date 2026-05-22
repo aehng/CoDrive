@@ -8,6 +8,16 @@ import org.junit.Test
 
 class ActiveSessionManagerTest {
     @Test
+    fun historyDisabledReturnsRawInputAndDoesNotKeepSession() {
+        val manager = ActiveSessionManager(historyEnabled = false, nowProvider = { 1L })
+
+        val prompt = manager.beginTurn("tap submit")
+
+        assertTrue(prompt == "tap submit")
+        assertFalse(manager.hasActiveSession())
+    }
+
+    @Test
     fun beginTurnReturnsRawInputWhenNoSessionExists() {
         val manager = ActiveSessionManager(nowProvider = { 1L })
 
@@ -94,6 +104,37 @@ class ActiveSessionManagerTest {
         )
 
         assertFalse(manager.hasActiveSession())
+    }
+
+    @Test
+    fun historyDepthCapsConversationWindow() {
+        var now = 1L
+        val manager = ActiveSessionManager(historyDepth = 1, nowProvider = { now })
+
+        manager.beginTurn("first")
+        manager.onDecision(
+            AgentDecision(
+                actionType = ActionType.RESPOND,
+                voiceFeedback = "first-reply",
+                confidenceScore = 0.7,
+            ),
+            didExecute = false,
+        )
+        now++
+        manager.beginTurn("second")
+        manager.onDecision(
+            AgentDecision(
+                actionType = ActionType.RESPOND,
+                voiceFeedback = "second-reply",
+                confidenceScore = 0.7,
+            ),
+            didExecute = false,
+        )
+        now++
+        val prompt = manager.beginTurn("third")
+
+        assertFalse(prompt.contains("first-reply"))
+        assertTrue(prompt.contains("second-reply"))
     }
 }
 

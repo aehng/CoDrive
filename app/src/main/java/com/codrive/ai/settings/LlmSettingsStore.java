@@ -13,9 +13,22 @@ public class LlmSettingsStore {
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_MODEL_PREFIX = "model_";
     private static final String KEY_API_KEY_PREFIX = "api_key_";
+    private static final String KEY_AGENTIC_BETA_ENABLED = "agentic_beta_enabled";
+    private static final String KEY_AGENTIC_MAX_ITERATIONS = "agentic_max_iterations";
+    private static final String KEY_HISTORY_ENABLED = "history_enabled";
+    private static final String KEY_HISTORY_DEPTH = "history_depth";
+    private static final String KEY_DUAL_ROUTING_ENABLED = "dual_routing_enabled";
+    private static final String KEY_DUAL_ROUTING_GROQ_PERCENT = "dual_routing_groq_percent";
 
     private static final String GROQ_DEFAULT_MODEL = "qwen/qwen3-32b";
     private static final String GEMINI_DEFAULT_MODEL = "gemini-1.5-flash";
+    private static final int AGENTIC_MAX_ITERATIONS_DEFAULT = 3;
+    private static final int AGENTIC_MAX_ITERATIONS_MIN = 1;
+    private static final int AGENTIC_MAX_ITERATIONS_MAX = 10;
+    private static final int HISTORY_DEPTH_DEFAULT = 4;
+    private static final int HISTORY_DEPTH_MIN = 0;
+    private static final int HISTORY_DEPTH_MAX = 20;
+    private static final int DUAL_ROUTING_GROQ_PERCENT_DEFAULT = 20;
 
     private final SharedPreferences prefs;
 
@@ -152,6 +165,72 @@ public class LlmSettingsStore {
                 .apply();
     }
 
+    public boolean isAgenticBetaEnabled() {
+        return prefs.getBoolean(KEY_AGENTIC_BETA_ENABLED, false);
+    }
+
+    public void setAgenticBetaEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_AGENTIC_BETA_ENABLED, enabled).apply();
+    }
+
+    public int getAgenticMaxIterations() {
+        return clampInt(
+                prefs.getInt(KEY_AGENTIC_MAX_ITERATIONS, AGENTIC_MAX_ITERATIONS_DEFAULT),
+                AGENTIC_MAX_ITERATIONS_MIN,
+                AGENTIC_MAX_ITERATIONS_MAX
+        );
+    }
+
+    public void setAgenticMaxIterations(int iterations) {
+        prefs.edit()
+                .putInt(KEY_AGENTIC_MAX_ITERATIONS, clampInt(iterations, AGENTIC_MAX_ITERATIONS_MIN, AGENTIC_MAX_ITERATIONS_MAX))
+                .apply();
+    }
+
+    public boolean isHistoryEnabled() {
+        return prefs.getBoolean(KEY_HISTORY_ENABLED, true);
+    }
+
+    public void setHistoryEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_HISTORY_ENABLED, enabled).apply();
+    }
+
+    public int getHistoryDepth() {
+        return clampInt(
+                prefs.getInt(KEY_HISTORY_DEPTH, HISTORY_DEPTH_DEFAULT),
+                HISTORY_DEPTH_MIN,
+                HISTORY_DEPTH_MAX
+        );
+    }
+
+    public void setHistoryDepth(int depth) {
+        prefs.edit()
+                .putInt(KEY_HISTORY_DEPTH, clampInt(depth, HISTORY_DEPTH_MIN, HISTORY_DEPTH_MAX))
+                .apply();
+    }
+
+    public boolean isDualRoutingEnabled() {
+        return prefs.getBoolean(KEY_DUAL_ROUTING_ENABLED, false);
+    }
+
+    public void setDualRoutingEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_DUAL_ROUTING_ENABLED, enabled).apply();
+    }
+
+    public int getDualRoutingGroqPercent() {
+        return clampInt(
+                prefs.getInt(KEY_DUAL_ROUTING_GROQ_PERCENT, DUAL_ROUTING_GROQ_PERCENT_DEFAULT),
+                0,
+                100
+        );
+    }
+
+    public void setDualRoutingGroqPercent(int percent) {
+        prefs.edit()
+                .putInt(KEY_DUAL_ROUTING_GROQ_PERCENT, clampInt(percent, 0, 100))
+                .apply();
+    }
+
     private String defaultModelFor(LlmProvider provider) {
         if (provider == LlmProvider.GROQ) {
             return GROQ_DEFAULT_MODEL;
@@ -160,6 +239,10 @@ public class LlmSettingsStore {
             return GEMINI_DEFAULT_MODEL;
         }
         return "";
+    }
+
+    private int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
 

@@ -159,6 +159,98 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/settings_model_hint"
                     android:inputType="text" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/settings_agentic_section_title"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/settingsAgenticEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_agentic_enabled" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_agentic_iterations_label" />
+
+                <SeekBar
+                    android:id="@+id/settingsAgenticIterationsSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="9" />
+
+                <TextView
+                    android:id="@+id/settingsAgenticIterationsValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="3" />
+
+                <CheckBox
+                    android:id="@+id/settingsHistoryEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/settings_history_enabled" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_history_depth_label" />
+
+                <SeekBar
+                    android:id="@+id/settingsHistoryDepthSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="20" />
+
+                <TextView
+                    android:id="@+id/settingsHistoryDepthValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="4" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/settings_dual_routing_section_title"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/settingsDualRoutingEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_dual_routing_enabled" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_dual_routing_ratio_label" />
+
+                <SeekBar
+                    android:id="@+id/settingsDualRoutingGroqSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100" />
+
+                <TextView
+                    android:id="@+id/settingsDualRoutingRatioValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="Groq 20% / Gemini 80%" />
             </LinearLayout>
 
             <LinearLayout

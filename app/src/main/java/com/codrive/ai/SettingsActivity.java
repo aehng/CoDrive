@@ -50,6 +50,15 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText apiKeyInput;
     private TextView keyPreview;
     private TextView statusText;
+    private CheckBox agenticEnabledCheckbox;
+    private SeekBar agenticIterationsSeekBar;
+    private TextView agenticIterationsValueText;
+    private CheckBox historyEnabledCheckbox;
+    private SeekBar historyDepthSeekBar;
+    private TextView historyDepthValueText;
+    private CheckBox dualRoutingEnabledCheckbox;
+    private SeekBar dualRoutingGroqSeekBar;
+    private TextView dualRoutingRatioValueText;
     private EditText sttLocaleInput;
     private EditText ttsLocaleInput;
     private SeekBar ttsRateSeekBar;
@@ -101,6 +110,7 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int STT_SILENCE_END_MIN = 120;
     private static final int STT_VAD_WINDOW_SIZE_MIN = 256;
     private static final int STT_VAD_THREADS_MIN = 1;
+    private static final int AGENTIC_ITERATIONS_MIN = 1;
     private static final String TAG = "SettingsActivity";
 
     @Override
@@ -117,6 +127,15 @@ public class SettingsActivity extends AppCompatActivity {
         apiKeyInput = findViewById(R.id.settingsApiKeyInput);
         keyPreview = findViewById(R.id.settingsKeyPreview);
         statusText = findViewById(R.id.settingsStatusText);
+        agenticEnabledCheckbox = findViewById(R.id.settingsAgenticEnabled);
+        agenticIterationsSeekBar = findViewById(R.id.settingsAgenticIterationsSeekBar);
+        agenticIterationsValueText = findViewById(R.id.settingsAgenticIterationsValue);
+        historyEnabledCheckbox = findViewById(R.id.settingsHistoryEnabled);
+        historyDepthSeekBar = findViewById(R.id.settingsHistoryDepthSeekBar);
+        historyDepthValueText = findViewById(R.id.settingsHistoryDepthValue);
+        dualRoutingEnabledCheckbox = findViewById(R.id.settingsDualRoutingEnabled);
+        dualRoutingGroqSeekBar = findViewById(R.id.settingsDualRoutingGroqSeekBar);
+        dualRoutingRatioValueText = findViewById(R.id.settingsDualRoutingRatioValue);
         modelSpinner = findViewById(R.id.settingsModelSpinner);
         sttLocaleInput = findViewById(R.id.settingsSttLocaleInput);
         ttsLocaleInput = findViewById(R.id.settingsTtsLocaleInput);
@@ -248,6 +267,21 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+        agenticIterationsSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                agenticIterationsValueText.setText(String.valueOf(progress + AGENTIC_ITERATIONS_MIN))
+        ));
+        historyDepthSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                historyDepthValueText.setText(progress == 0 ? getString(R.string.settings_history_none) : String.valueOf(progress))
+        ));
+        historyEnabledCheckbox.setOnCheckedChangeListener((buttonView, isChecked) ->
+                historyDepthSeekBar.setEnabled(isChecked)
+        );
+        dualRoutingGroqSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                updateDualRoutingRatioValue(progress)
+        ));
+        dualRoutingEnabledCheckbox.setOnCheckedChangeListener((buttonView, isChecked) ->
+                dualRoutingGroqSeekBar.setEnabled(isChecked)
+        );
 
         ttsPitchSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -333,6 +367,23 @@ public class SettingsActivity extends AppCompatActivity {
         int vadThreads = voiceSettingsStore.getSttVadNumThreads();
         vadThreadsSeekBar.setProgress(vadThreads - STT_VAD_THREADS_MIN);
         vadThreadsValueText.setText(String.valueOf(vadThreads));
+        boolean agenticEnabled = settingsStore.isAgenticBetaEnabled();
+        agenticEnabledCheckbox.setChecked(agenticEnabled);
+        int iterations = settingsStore.getAgenticMaxIterations();
+        agenticIterationsSeekBar.setProgress(iterations - AGENTIC_ITERATIONS_MIN);
+        agenticIterationsValueText.setText(String.valueOf(iterations));
+        boolean historyEnabled = settingsStore.isHistoryEnabled();
+        historyEnabledCheckbox.setChecked(historyEnabled);
+        int historyDepth = settingsStore.getHistoryDepth();
+        historyDepthSeekBar.setProgress(historyDepth);
+        historyDepthSeekBar.setEnabled(historyEnabled);
+        historyDepthValueText.setText(historyDepth == 0 ? getString(R.string.settings_history_none) : String.valueOf(historyDepth));
+        boolean dualRoutingEnabled = settingsStore.isDualRoutingEnabled();
+        dualRoutingEnabledCheckbox.setChecked(dualRoutingEnabled);
+        int groqPercent = settingsStore.getDualRoutingGroqPercent();
+        dualRoutingGroqSeekBar.setProgress(groqPercent);
+        dualRoutingGroqSeekBar.setEnabled(dualRoutingEnabled);
+        updateDualRoutingRatioValue(groqPercent);
     }
 
     private void saveSettings() {
@@ -358,6 +409,12 @@ public class SettingsActivity extends AppCompatActivity {
         voiceSettingsStore.setSttVadNumThreads(vadThreadsSeekBar.getProgress() + STT_VAD_THREADS_MIN);
 
         settingsStore.saveProviderAndModel(provider, model);
+        settingsStore.setAgenticBetaEnabled(agenticEnabledCheckbox.isChecked());
+        settingsStore.setAgenticMaxIterations(agenticIterationsSeekBar.getProgress() + AGENTIC_ITERATIONS_MIN);
+        settingsStore.setHistoryEnabled(historyEnabledCheckbox.isChecked());
+        settingsStore.setHistoryDepth(historyDepthSeekBar.getProgress());
+        settingsStore.setDualRoutingEnabled(dualRoutingEnabledCheckbox.isChecked());
+        settingsStore.setDualRoutingGroqPercent(dualRoutingGroqSeekBar.getProgress());
         if (!TextUtils.isEmpty(enteredKey)) {
             settingsStore.saveApiKeyFor(provider, enteredKey);
         }
@@ -641,6 +698,11 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void updateTtsPitchValue(float pitch) {
         ttsPitchValueText.setText(String.format(Locale.US, "%.2f", pitch));
+    }
+
+    private void updateDualRoutingRatioValue(int groqPercent) {
+        int geminiPercent = 100 - Math.max(0, Math.min(100, groqPercent));
+        dualRoutingRatioValueText.setText(getString(R.string.settings_dual_routing_ratio_format, groqPercent, geminiPercent));
     }
 
     private SeekBar.OnSeekBarChangeListener simpleSeekBarListener(ProgressChanged onProgressChanged) {
