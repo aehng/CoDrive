@@ -33,6 +33,7 @@ class LlmModelCatalog(
         return when (provider) {
             LlmProvider.GROQ -> fetchGroq(apiKey, timeoutMillis)
             LlmProvider.GEMINI -> fetchGemini(apiKey, timeoutMillis)
+            LlmProvider.OPENROUTER -> fetchOpenRouter(apiKey, timeoutMillis)
             else -> LlmModelListResult(false, emptyList(), "Provider not supported")
         }
     }
@@ -98,6 +99,40 @@ class LlmModelCatalog(
             LlmModelListResult(true, models.sortedBy { it.displayName }, "OK")
         }.getOrElse {
             LlmModelListResult(false, emptyList(), "Gemini model list parse failed")
+        }
+    }
+
+    private fun fetchOpenRouter(apiKey: String, timeoutMillis: Int): LlmModelListResult {
+        val url = "https://openrouter.ai/api/v1/models"
+        val headers = mapOf("Authorization" to "Bearer $apiKey")
+        val (code, body) = transport.get(url, headers, timeoutMillis)
+        if (code !in 200..299) {
+            return LlmModelListResult(false, emptyList(), "OpenRouter model list failed ($code)")
+        }
+        return parseOpenRouterModels(body)
+    }
+
+    private fun parseOpenRouterModels(body: String): LlmModelListResult {
+        return runCatching {
+            val root = JSONObject(body)
+            val data = root.optJSONArray("data") ?: JSONArray()
+            val models = mutableListOf<LlmModelInfo>()
+            for (i in 0 until data.length()) {
+                val item = data.optJSONObject(i) ?: continue
+                val id = item.optString("id", "").trim()
+                if (id.isEmpty()) continue
+                val name = item.optString("name", "").trim()
+                val description = item.optString("description", "").trim()
+                val displayName = when {
+                    name.isNotEmpty() -> name
+                    description.isNotEmpty() -> "$id - $description"
+                    else -> id
+                }
+                models.add(LlmModelInfo(id = id, displayName = displayName))
+            }
+            LlmModelListResult(true, models.sortedBy { it.displayName }, "OK")
+        }.getOrElse {
+            LlmModelListResult(false, emptyList(), "OpenRouter model list parse failed")
         }
     }
 

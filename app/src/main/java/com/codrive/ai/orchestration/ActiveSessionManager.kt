@@ -74,11 +74,8 @@ class ActiveSessionManager @JvmOverloads constructor(
         if (decision.actionType == ActionType.RESPOND) {
             return true
         }
-        if (decision.requiresClarification() && decision.actionType != ActionType.FINISH) {
+        if (decision.requiresConfirmation() && decision.actionType != ActionType.FINISH) {
             return true
-        }
-        if (didExecute) {
-            return false
         }
         return false
     }

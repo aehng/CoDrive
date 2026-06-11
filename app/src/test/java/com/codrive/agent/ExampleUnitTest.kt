@@ -14,6 +14,8 @@ class ExampleUnitTest {
     @Test
     fun policyThresholdIsConfiguredForTracerBulletSafety() {
         assertEquals(0.8, AgentPolicy.confidenceClarificationThreshold, 0.0)
+        assertEquals(0.2, AgentPolicy.hardConfirmationThreshold, 0.0)
         assertTrue(AgentPolicy.shouldClarify(0.79))
+        assertTrue(AgentPolicy.shouldRequireConfirmation(0.19))
     }
 }

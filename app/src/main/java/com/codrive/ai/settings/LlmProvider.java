@@ -3,6 +3,7 @@ package com.codrive.ai.settings;
 public enum LlmProvider {
     GROQ("Groq"),
     GEMINI("Gemini"),
+    OPENROUTER("OpenRouter"),
     OPENAI("OpenAI"),
     CUSTOM_HTTP("Custom HTTP");
 
@@ -33,7 +34,7 @@ public enum LlmProvider {
     }
 
     public boolean isTracerBulletSupported() {
-        return this == GROQ || this == GEMINI;
+        return this == GROQ || this == GEMINI || this == OPENROUTER;
     }
 }
 

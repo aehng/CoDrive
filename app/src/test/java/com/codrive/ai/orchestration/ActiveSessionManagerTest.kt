@@ -90,6 +90,23 @@ class ActiveSessionManagerTest {
     }
 
     @Test
+    fun veryLowConfidenceNonTerminalDecisionKeepsSessionOpenForConfirmation() {
+        val manager = ActiveSessionManager(nowProvider = { 1L })
+
+        manager.beginTurn("do something")
+        manager.onDecision(
+            AgentDecision(
+                actionType = ActionType.CLICK,
+                voiceFeedback = "I need confirmation before I act.",
+                confidenceScore = 0.1,
+            ),
+            didExecute = false,
+        )
+
+        assertTrue(manager.hasActiveSession())
+    }
+
+    @Test
     fun failClosedFinishDoesNotKeepSession() {
         val manager = ActiveSessionManager(nowProvider = { 1L })
 
@@ -97,7 +114,7 @@ class ActiveSessionManagerTest {
         manager.onDecision(
             AgentDecision(
                 actionType = ActionType.FINISH,
-                voiceFeedback = "I need clarification before I act.",
+                voiceFeedback = "I need confirmation before I act.",
                 confidenceScore = 0.0,
             ),
             didExecute = false,

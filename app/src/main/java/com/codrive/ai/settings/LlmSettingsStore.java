@@ -22,6 +22,7 @@ public class LlmSettingsStore {
 
     private static final String GROQ_DEFAULT_MODEL = "qwen/qwen3-32b";
     private static final String GEMINI_DEFAULT_MODEL = "gemini-1.5-flash";
+    private static final String OPENROUTER_DEFAULT_MODEL = "openrouter/owl-alpha";
     private static final int AGENTIC_MAX_ITERATIONS_DEFAULT = 3;
     private static final int AGENTIC_MAX_ITERATIONS_MIN = 1;
     private static final int AGENTIC_MAX_ITERATIONS_MAX = 10;
@@ -237,6 +238,9 @@ public class LlmSettingsStore {
         }
         if (provider == LlmProvider.GEMINI) {
             return GEMINI_DEFAULT_MODEL;
+        }
+        if (provider == LlmProvider.OPENROUTER) {
+            return OPENROUTER_DEFAULT_MODEL;
         }
         return "";
     }

@@ -44,7 +44,7 @@
     <string name="settings_save_button">Save Settings</string>
     <string name="settings_status_idle">Update LLM or voice settings and tap Save.</string>
     <string name="settings_saved">Saved. Runtime will use this provider/model for new requests.</string>
-    <string name="settings_saved_provider_not_wired">Saved. Selected provider is not wired yet in tracer bullet; switch to Groq to run now.</string>
+    <string name="settings_saved_provider_not_wired">Saved. Selected provider is not wired yet in tracer bullet; switch to Groq, Gemini, or OpenRouter to run now.</string>
     <string name="settings_status_validating">Validating API key...</string>
     <string name="settings_saved_but_validation_failed">Saved, but validation failed: %1$s</string>
     <string name="chat_generic_error_message">I could not complete that request.</string>

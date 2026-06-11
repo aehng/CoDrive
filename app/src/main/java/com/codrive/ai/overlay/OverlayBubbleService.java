@@ -325,9 +325,6 @@ public class OverlayBubbleService extends Service {
         }
         restoreAudioMode();
         releaseTtsEngine();
-        if (identityDatabase != null) {
-            identityDatabase.close();
-        }
         detachOverlay();
         super.onDestroy();
     }

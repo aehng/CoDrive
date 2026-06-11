@@ -52,11 +52,25 @@ class ChatTracerBulletOrchestrator @JvmOverloads constructor(
             )
         }
 
-        if (decision.requiresClarification()) {
+        if (decision.actionType == ActionType.FINISH) {
             val message = if (decision.voiceFeedback.isNotBlank()) {
                 decision.voiceFeedback
             } else {
-                "I need clarification before I act."
+                "Finished."
+            }
+            return TracerBulletResult(
+                finalFeedback = message,
+                decision = decision,
+                executionResult = null,
+                didExecute = false,
+            )
+        }
+
+        if (decision.requiresConfirmation()) {
+            val message = if (decision.voiceFeedback.isNotBlank()) {
+                decision.voiceFeedback
+            } else {
+                "I need confirmation before I act."
             }
             return TracerBulletResult(
                 finalFeedback = message,

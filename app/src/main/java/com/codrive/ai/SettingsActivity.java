@@ -29,6 +29,7 @@ import com.codrive.ai.contracts.TtsEngine;
 import com.codrive.ai.llm.LlmModelCatalog;
 import com.codrive.ai.llm.LlmModelInfo;
 import com.codrive.ai.llm.LlmModelListResult;
+import com.codrive.ai.llm.LlmKeyValidator;
 import com.codrive.ai.modeldownload.ModelReadiness;
 import com.codrive.ai.modeldownload.ModelStorage;
 import com.codrive.ai.settings.LlmProvider;
@@ -427,8 +428,23 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
 
-        // For tracer-bullet providers (Groq, Gemini) run a lightweight validation when a key was entered.
-        if (provider == LlmProvider.GEMINI && !TextUtils.isEmpty(settingsStore.getApiKeyFor(provider))) {
+        // For tracer-bullet providers run a lightweight validation when a key was entered.
+        if ((provider == LlmProvider.GROQ || provider == LlmProvider.OPENROUTER) && !TextUtils.isEmpty(settingsStore.getApiKeyFor(provider))) {
+            statusText.setText(R.string.settings_status_validating);
+            final String keyToValidate = settingsStore.getApiKeyFor(provider);
+            final String modelToValidate = settingsStore.getModelFor(provider);
+            new Thread(() -> {
+                LlmKeyValidator validator = new LlmKeyValidator();
+                com.codrive.ai.llm.KeyValidationResult result = validator.validate(provider, modelToValidate, keyToValidate);
+                runOnUiThread(() -> {
+                    if (result.isValid()) {
+                        statusText.setText(R.string.settings_saved);
+                    } else {
+                        statusText.setText(getString(R.string.settings_saved_but_validation_failed, result.getMessage()));
+                    }
+                });
+            }).start();
+        } else if (provider == LlmProvider.GEMINI && !TextUtils.isEmpty(settingsStore.getApiKeyFor(provider))) {
             statusText.setText(R.string.settings_status_validating);
             final String keyToValidate = settingsStore.getApiKeyFor(provider);
             final String modelToValidate = settingsStore.getModelFor(provider);

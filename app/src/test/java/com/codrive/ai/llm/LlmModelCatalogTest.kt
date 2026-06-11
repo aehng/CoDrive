@@ -55,5 +55,25 @@ class LlmModelCatalogTest {
         assertEquals("models/gemini-1.5-flash", result.models[0].id)
         assertTrue(result.models[0].displayName.contains("Flash"))
     }
+
+    @Test
+    fun openRouterModelListParsesIdsAndNames() {
+        val json = """
+            {
+              "data": [
+                {"id": "openrouter/owl-alpha", "name": "Owl Alpha"},
+                {"id": "anthropic/claude-3.5-sonnet", "description": "Claude"}
+              ]
+            }
+        """.trimIndent()
+        val transport = ModelListTransport { _, _, _ -> 200 to json }
+        val catalog = LlmModelCatalog(transport)
+
+        val result = catalog.fetch(LlmProvider.OPENROUTER, "key")
+
+        assertTrue(result.success)
+        assertEquals(2, result.models.size)
+        assertTrue(result.models.any { it.id == "openrouter/owl-alpha" && it.displayName.isNotBlank() })
+    }
 }
 

@@ -2,6 +2,7 @@ package com.codrive.ai.model
 
 object AgentPolicy {
     const val confidenceClarificationThreshold: Double = 0.8
+    const val hardConfirmationThreshold: Double = 0.2
     const val activeSessionTimeoutMillis: Long = 30_000L
     const val groqRequestTimeoutMillis: Long = 12_000L
     const val groqRetryAttempts: Int = 1
@@ -10,6 +11,8 @@ object AgentPolicy {
     const val groqHardTokenBudget: Int = 2_000
 
     fun shouldClarify(confidenceScore: Double): Boolean = confidenceScore < confidenceClarificationThreshold
+
+    fun shouldRequireConfirmation(confidenceScore: Double): Boolean = confidenceScore < hardConfirmationThreshold
 }
 
 enum class ActionType {
@@ -77,6 +80,8 @@ data class AgentDecision(
     val confidenceScore: Double,
 ) {
     fun requiresClarification(): Boolean = AgentPolicy.shouldClarify(confidenceScore)
+
+    fun requiresConfirmation(): Boolean = AgentPolicy.shouldRequireConfirmation(confidenceScore)
 }
 
 data class ExecutionResult(

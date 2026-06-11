@@ -56,7 +56,11 @@ public final class LlmClientFactory {
             return new GeminiLlmClient(apiKey, model);
         }
 
-        return unsupported(provider.displayName() + " is selected, but only Groq and Gemini are wired in tracer bullet right now.");
+        if (provider == LlmProvider.OPENROUTER) {
+            return new OpenRouterLlmClient(apiKey, model);
+        }
+
+        return unsupported(provider.displayName() + " is selected, but only Groq, Gemini, and OpenRouter are wired in tracer bullet right now.");
     }
 
     private static LlmClient unsupported(String message) {

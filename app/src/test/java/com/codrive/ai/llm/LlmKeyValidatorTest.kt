@@ -43,6 +43,15 @@ class LlmKeyValidatorTest {
 
         assertTrue(result.isValid)
     }
+
+    @Test
+    fun validateAcceptsOpenRouterWhenWired() {
+        val validator = LlmKeyValidator { _, _, _ -> 200 to "{}" }
+
+        val result = validator.validate(LlmProvider.OPENROUTER, "openrouter/owl-alpha", "key")
+
+        assertTrue(result.isValid)
+    }
 }
 
 

@@ -38,6 +38,13 @@ class LlmClientFactoryTest {
         assertTrue(client is GroqLlmClient)
     }
 
+    @Test
+    fun createForOpenRouterReturnsOpenRouterClient() {
+        val client = LlmClientFactory.createFor(LlmProvider.OPENROUTER, "openrouter/owl-alpha", "key")
+
+        assertTrue(client is OpenRouterLlmClient)
+    }
+
     private fun sampleUiMap(): PrunedUiMap = PrunedUiMap(
         snapshotId = 1L,
         entries = listOf(

@@ -24,8 +24,8 @@ class LlmKeyValidator(
             return KeyValidationResult(false, "API key is required.")
         }
 
-        // Support validation for wired providers (GROQ and GEMINI). Other providers are not wired yet.
-        val wiredProviders = setOf(LlmProvider.GROQ, LlmProvider.GEMINI)
+        // Support validation for wired providers (GROQ, GEMINI, and OPENROUTER). Other providers are not wired yet.
+        val wiredProviders = setOf(LlmProvider.GROQ, LlmProvider.GEMINI, LlmProvider.OPENROUTER)
         if (provider !in wiredProviders) {
             return KeyValidationResult(
                 false,
@@ -44,6 +44,15 @@ class LlmKeyValidator(
                     when {
                         statusCode in 200..299 -> KeyValidationResult(true, "Key validated. Returning to chat launcher.")
                         statusCode == 401 || statusCode == 403 -> KeyValidationResult(false, "Invalid Groq API key.")
+                        statusCode == 429 -> KeyValidationResult(true, "Key accepted (rate-limited right now).")
+                        else -> KeyValidationResult(false, "Validation failed (${statusCode}).")
+                    }
+                }
+                LlmProvider.OPENROUTER -> {
+                    val (statusCode, _) = transport.get(OPENROUTER_MODELS_URL, apiKey, VALIDATION_TIMEOUT_MS)
+                    when {
+                        statusCode in 200..299 -> KeyValidationResult(true, "Key validated. Returning to chat launcher.")
+                        statusCode == 401 || statusCode == 403 -> KeyValidationResult(false, "Invalid OpenRouter API key.")
                         statusCode == 429 -> KeyValidationResult(true, "Key accepted (rate-limited right now).")
                         else -> KeyValidationResult(false, "Validation failed (${statusCode}).")
                     }
@@ -67,6 +76,7 @@ class LlmKeyValidator(
 
     companion object {
         private const val GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
+        private const val OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
         private const val GEMINI_PREDICT_URL = "https://generativelanguage.googleapis.com/v1beta/models:predict"
         private const val VALIDATION_TIMEOUT_MS = 6_000
 

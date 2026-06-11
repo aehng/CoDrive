@@ -27,9 +27,10 @@ CoDrive is an Android 13+ accessibility proxy for overlay chat and future voice-
 - Package name: `com.codrive.ai`
 - Min SDK: 33
 - Room is scaffolded for durable identity memory and rolling session context
-- Configure Groq key locally only (do not commit):
-  - `local.properties` -> `GROQ_API_KEY=your_key_here`
-  - or environment variable `GROQ_API_KEY`
+- Configure LLM keys locally only (do not commit):
+  - Groq: `local.properties` -> `GROQ_API_KEY=your_key_here` or environment variable `GROQ_API_KEY`
+  - OpenRouter: `local.properties` -> `OPENROUTER_API_KEY=your_key_here` or environment variable `OPENROUTER_API_KEY`
+  - OpenRouter Owl Alpha uses the model slug `openrouter/owl-alpha`
 - Main launcher behavior: never auto-opens accessibility settings; user taps manual button when service is OFF
 - Phase 3 adds strict Groq JSON parsing, retry/rate-limit handling, and a bounded memory lookup loop
 - Phase 2 adds DFS pruning, explicit role mapping, live node indexing, and unreadable-screen fail-closed behavior

@@ -11,9 +11,12 @@ class AgentModelsTest {
     @Test
     fun policyThresholdMatchesMission() {
         assertEquals(0.8, AgentPolicy.confidenceClarificationThreshold, 0.0)
+        assertEquals(0.2, AgentPolicy.hardConfirmationThreshold, 0.0)
         assertEquals(30_000L, AgentPolicy.activeSessionTimeoutMillis)
         assertTrue(AgentPolicy.shouldClarify(0.79))
         assertFalse(AgentPolicy.shouldClarify(0.8))
+        assertTrue(AgentPolicy.shouldRequireConfirmation(0.19))
+        assertFalse(AgentPolicy.shouldRequireConfirmation(0.2))
     }
 
     @Test
@@ -81,6 +84,7 @@ class AgentModelsTest {
         )
 
         assertFalse(decision.requiresClarification())
+        assertFalse(decision.requiresConfirmation())
         assertEquals(ActionType.TYPE, decision.actionType)
         assertEquals(4, decision.targetIndex)
     }

@@ -15,20 +15,22 @@ class LlmProviderTest {
     @Test
     fun fromStorageValueParsesKnownProvider() {
         assertEquals(LlmProvider.GEMINI, LlmProvider.fromStorageValue("gemini"))
+        assertEquals(LlmProvider.OPENROUTER, LlmProvider.fromStorageValue("openrouter"))
         assertEquals(LlmProvider.OPENAI, LlmProvider.fromStorageValue("OPENAI"))
     }
 
     @Test
-    fun tracerBulletSupportIsGroqOnlyForNow() {
+    fun tracerBulletSupportIncludesOpenRouter() {
         assertTrue(LlmProvider.GROQ.isTracerBulletSupported())
-        // Gemini is now wired in the tracer-bullet path (skeleton transport). OpenAI remains unsupported.
         assertTrue(LlmProvider.GEMINI.isTracerBulletSupported())
+        assertTrue(LlmProvider.OPENROUTER.isTracerBulletSupported())
         assertFalse(LlmProvider.OPENAI.isTracerBulletSupported())
     }
 
     @Test
-    fun geminiDisplayNameIsModelLabel() {
+    fun providerDisplayNamesAreStable() {
         assertEquals("Gemini", LlmProvider.GEMINI.displayName())
+        assertEquals("OpenRouter", LlmProvider.OPENROUTER.displayName())
     }
 }
 
