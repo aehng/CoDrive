@@ -67,6 +67,10 @@
     <string name="settings_dual_routing_enabled">Alternate between Groq and Gemini for LLM calls</string>
     <string name="settings_dual_routing_ratio_label">Groq share (Gemini gets the remainder)</string>
     <string name="settings_dual_routing_ratio_format">Groq %1$d%% / Gemini %2$d%%</string>
+    <string name="settings_confirmation_threshold_section_title">Action Confirmation</string>
+    <string name="settings_confirmation_threshold_label">Confirm actions below this confidence</string>
+    <string name="settings_confirmation_threshold_help">0% disables confirmation gating. Higher values require confirmation for more uncertain actions.</string>
+    <string name="settings_confirmation_threshold_disabled">Disabled (0%%)</string>
     <string name="settings_tab_llm">LLM</string>
     <string name="settings_tab_voice">Voice</string>
     <string name="settings_tab_stt">STT Filters</string>

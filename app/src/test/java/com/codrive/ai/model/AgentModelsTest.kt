@@ -20,6 +20,22 @@ class AgentModelsTest {
     }
 
     @Test
+    fun confirmationThresholdCanBeDisabled() {
+        val original = AgentPolicy.getConfirmationThreshold()
+        try {
+            AgentPolicy.setConfirmationThreshold(0.0)
+            assertFalse(AgentPolicy.shouldRequireConfirmation(0.01))
+            assertFalse(AgentPolicy.shouldRequireConfirmation(0.99))
+
+            AgentPolicy.setConfirmationThreshold(0.5)
+            assertTrue(AgentPolicy.shouldRequireConfirmation(0.49))
+            assertFalse(AgentPolicy.shouldRequireConfirmation(0.5))
+        } finally {
+            AgentPolicy.setConfirmationThreshold(original)
+        }
+    }
+
+    @Test
     fun actionTypeEnumerationContainsTracerBulletActions() {
         assertEquals(ActionType.CLICK, ActionType.valueOf("CLICK"))
         assertEquals(ActionType.OPEN_NOTIFICATIONS, ActionType.valueOf("OPEN_NOTIFICATIONS"))

@@ -30,6 +30,7 @@ import com.codrive.ai.memory.IdentityDatabase;
 import com.codrive.ai.memory.MemorySearchTool;
 import com.codrive.ai.model.ActionType;
 import com.codrive.ai.model.AgentDecision;
+import com.codrive.ai.model.AgentPolicy;
 import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.AgenticLoopCoordinator;
@@ -98,6 +99,7 @@ public class ChatActivity extends AppCompatActivity {
                 "codrive_identity.db"
         ).fallbackToDestructiveMigration().build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
+        AgentPolicy.setConfirmationThreshold(llmSettingsStore.getConfirmationThreshold());
         voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager(
                 30_000L,
@@ -129,6 +131,9 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (llmSettingsStore != null) {
+            AgentPolicy.setConfirmationThreshold(llmSettingsStore.getConfirmationThreshold());
+        }
         refreshTtsEngine();
     }
 

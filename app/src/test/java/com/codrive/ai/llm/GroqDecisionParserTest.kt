@@ -87,6 +87,27 @@ class GroqDecisionParserTest {
     }
 
     @Test
+    fun parseAcceptsCamelCaseConfidenceScoreFallback() {
+        val parser = GroqDecisionParser()
+        val response = """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "{\"action_type\":\"CLICK\",\"target_index\":1,\"text_to_type\":\"\",\"tool_query\":\"\",\"voice_feedback\":\"Tap\",\"confidenceScore\":0.81}"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val decision = parser.parse(response)
+
+        assertEquals(ActionType.CLICK, decision.actionType)
+        assertEquals(0.81, decision.confidenceScore, 0.0)
+    }
+
+    @Test
     fun parseRespondSoftDefaultsMissingOptionalFields() {
         val parser = GroqDecisionParser()
         val response = """

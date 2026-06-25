@@ -32,8 +32,7 @@ class GroqDecisionParser(
 
             // Soft-default for RESPOND: allow missing fields if it's a simple response
             if (actionType == ActionType.RESPOND) {
-                val confidenceScore = json.optDouble("confidence_score", 1.0)
-                    .coerceIn(0.0, 1.0)
+                val confidenceScore = readConfidenceScore(json, defaultValue = 1.0) ?: 1.0
                 return AgentDecision(
                     actionType = ActionType.RESPOND,
                     targetIndex = json.optInt("target_index", 0),
@@ -53,7 +52,8 @@ class GroqDecisionParser(
                 return failClosed("Invalid action_type: $actionTypeStr", decisionJsonText)
             }
 
-            val confidenceScore = json.getDouble("confidence_score")
+            val confidenceScore = readConfidenceScore(json, defaultValue = null)
+                ?: return failClosed("Missing confidence score", decisionJsonText)
             if (confidenceScore !in 0.0..1.0) {
                 return failClosed("Confidence score out of bounds: $confidenceScore", decisionJsonText)
             }
@@ -72,16 +72,37 @@ class GroqDecisionParser(
     }
 
     private fun hasAllRequiredFields(json: JSONObject): Boolean {
-        return REQUIRED_FIELDS.all(json::has)
+        return REQUIRED_FIELDS.all { hasRequiredField(json, it) }
     }
 
     private fun getMissingFields(json: JSONObject): List<String> {
-        return REQUIRED_FIELDS.filter { !json.has(it) }
+        return REQUIRED_FIELDS.filter { !hasRequiredField(json, it) }
     }
 
     private fun parseActionType(value: String): ActionType? = runCatching {
         ActionType.valueOf(value.trim().uppercase())
     }.getOrNull()
+
+    private fun hasRequiredField(json: JSONObject, fieldName: String): Boolean {
+        return when (fieldName) {
+            "confidence_score" -> json.has("confidence_score") || json.has("confidenceScore")
+            else -> json.has(fieldName)
+        }
+    }
+
+    private fun readConfidenceScore(json: JSONObject, defaultValue: Double? = null): Double? {
+        if (json.has("confidence_score")) {
+            return json.optDouble("confidence_score", Double.NaN)
+                .takeIf { !it.isNaN() }
+                ?.coerceIn(0.0, 1.0)
+        }
+        if (json.has("confidenceScore")) {
+            return json.optDouble("confidenceScore", Double.NaN)
+                .takeIf { !it.isNaN() }
+                ?.coerceIn(0.0, 1.0)
+        }
+        return defaultValue?.coerceIn(0.0, 1.0)
+    }
 
     private fun failClosed(reason: String, raw: String): AgentDecision {
         val sanitizedRaw = sanitizeForTelemetry(raw)

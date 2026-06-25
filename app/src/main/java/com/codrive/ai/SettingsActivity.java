@@ -60,6 +60,8 @@ public class SettingsActivity extends AppCompatActivity {
     private CheckBox dualRoutingEnabledCheckbox;
     private SeekBar dualRoutingGroqSeekBar;
     private TextView dualRoutingRatioValueText;
+    private SeekBar confirmationThresholdSeekBar;
+    private TextView confirmationThresholdValueText;
     private EditText sttLocaleInput;
     private EditText ttsLocaleInput;
     private SeekBar ttsRateSeekBar;
@@ -137,6 +139,8 @@ public class SettingsActivity extends AppCompatActivity {
         dualRoutingEnabledCheckbox = findViewById(R.id.settingsDualRoutingEnabled);
         dualRoutingGroqSeekBar = findViewById(R.id.settingsDualRoutingGroqSeekBar);
         dualRoutingRatioValueText = findViewById(R.id.settingsDualRoutingRatioValue);
+        confirmationThresholdSeekBar = findViewById(R.id.settingsConfirmationThresholdSeekBar);
+        confirmationThresholdValueText = findViewById(R.id.settingsConfirmationThresholdValue);
         modelSpinner = findViewById(R.id.settingsModelSpinner);
         sttLocaleInput = findViewById(R.id.settingsSttLocaleInput);
         ttsLocaleInput = findViewById(R.id.settingsTtsLocaleInput);
@@ -283,6 +287,9 @@ public class SettingsActivity extends AppCompatActivity {
         dualRoutingEnabledCheckbox.setOnCheckedChangeListener((buttonView, isChecked) ->
                 dualRoutingGroqSeekBar.setEnabled(isChecked)
         );
+        confirmationThresholdSeekBar.setOnSeekBarChangeListener(simpleSeekBarListener(progress ->
+                updateConfirmationThresholdValue(progress)
+        ));
 
         ttsPitchSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -385,6 +392,9 @@ public class SettingsActivity extends AppCompatActivity {
         dualRoutingGroqSeekBar.setProgress(groqPercent);
         dualRoutingGroqSeekBar.setEnabled(dualRoutingEnabled);
         updateDualRoutingRatioValue(groqPercent);
+        int confirmationThresholdPercent = settingsStore.getConfirmationThresholdPercent();
+        confirmationThresholdSeekBar.setProgress(confirmationThresholdPercent);
+        updateConfirmationThresholdValue(confirmationThresholdPercent);
     }
 
     private void saveSettings() {
@@ -416,6 +426,8 @@ public class SettingsActivity extends AppCompatActivity {
         settingsStore.setHistoryDepth(historyDepthSeekBar.getProgress());
         settingsStore.setDualRoutingEnabled(dualRoutingEnabledCheckbox.isChecked());
         settingsStore.setDualRoutingGroqPercent(dualRoutingGroqSeekBar.getProgress());
+        settingsStore.setConfirmationThresholdPercent(confirmationThresholdSeekBar.getProgress());
+        com.codrive.ai.model.AgentPolicy.setConfirmationThreshold(settingsStore.getConfirmationThreshold());
         if (!TextUtils.isEmpty(enteredKey)) {
             settingsStore.saveApiKeyFor(provider, enteredKey);
         }
@@ -719,6 +731,15 @@ public class SettingsActivity extends AppCompatActivity {
     private void updateDualRoutingRatioValue(int groqPercent) {
         int geminiPercent = 100 - Math.max(0, Math.min(100, groqPercent));
         dualRoutingRatioValueText.setText(getString(R.string.settings_dual_routing_ratio_format, groqPercent, geminiPercent));
+    }
+
+    private void updateConfirmationThresholdValue(int percent) {
+        int clamped = Math.max(0, Math.min(100, percent));
+        if (clamped == 0) {
+            confirmationThresholdValueText.setText(R.string.settings_confirmation_threshold_disabled);
+            return;
+        }
+        confirmationThresholdValueText.setText(clamped + "%");
     }
 
     private SeekBar.OnSeekBarChangeListener simpleSeekBarListener(ProgressChanged onProgressChanged) {

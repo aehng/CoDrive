@@ -19,6 +19,7 @@ public class LlmSettingsStore {
     private static final String KEY_HISTORY_DEPTH = "history_depth";
     private static final String KEY_DUAL_ROUTING_ENABLED = "dual_routing_enabled";
     private static final String KEY_DUAL_ROUTING_GROQ_PERCENT = "dual_routing_groq_percent";
+    private static final String KEY_CONFIRMATION_THRESHOLD_PERCENT = "confirmation_threshold_percent";
 
     private static final String GROQ_DEFAULT_MODEL = "qwen/qwen3-32b";
     private static final String GEMINI_DEFAULT_MODEL = "gemini-1.5-flash";
@@ -30,6 +31,7 @@ public class LlmSettingsStore {
     private static final int HISTORY_DEPTH_MIN = 0;
     private static final int HISTORY_DEPTH_MAX = 20;
     private static final int DUAL_ROUTING_GROQ_PERCENT_DEFAULT = 20;
+    private static final int CONFIRMATION_THRESHOLD_PERCENT_DEFAULT = 20;
 
     private final SharedPreferences prefs;
 
@@ -229,6 +231,24 @@ public class LlmSettingsStore {
     public void setDualRoutingGroqPercent(int percent) {
         prefs.edit()
                 .putInt(KEY_DUAL_ROUTING_GROQ_PERCENT, clampInt(percent, 0, 100))
+                .apply();
+    }
+
+    public int getConfirmationThresholdPercent() {
+        return clampInt(
+                prefs.getInt(KEY_CONFIRMATION_THRESHOLD_PERCENT, CONFIRMATION_THRESHOLD_PERCENT_DEFAULT),
+                0,
+                100
+        );
+    }
+
+    public double getConfirmationThreshold() {
+        return getConfirmationThresholdPercent() / 100.0;
+    }
+
+    public void setConfirmationThresholdPercent(int percent) {
+        prefs.edit()
+                .putInt(KEY_CONFIRMATION_THRESHOLD_PERCENT, clampInt(percent, 0, 100))
                 .apply();
     }
 

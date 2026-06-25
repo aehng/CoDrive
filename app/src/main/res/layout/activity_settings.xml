@@ -251,6 +251,38 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:text="Groq 20% / Gemini 80%" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/settings_confirmation_threshold_section_title"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_confirmation_threshold_label" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_confirmation_threshold_help"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/settingsConfirmationThresholdSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100" />
+
+                <TextView
+                    android:id="@+id/settingsConfirmationThresholdValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="20%" />
             </LinearLayout>
 
             <LinearLayout

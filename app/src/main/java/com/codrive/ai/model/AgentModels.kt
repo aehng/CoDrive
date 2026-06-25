@@ -10,9 +10,23 @@ object AgentPolicy {
     const val groqSoftTokenBudget: Int = 1_500
     const val groqHardTokenBudget: Int = 2_000
 
+    @Volatile
+    private var confirmationThreshold: Double = hardConfirmationThreshold
+
+    @JvmStatic
+    fun setConfirmationThreshold(threshold: Double) {
+        confirmationThreshold = threshold.coerceIn(0.0, 1.0)
+    }
+
+    @JvmStatic
+    fun getConfirmationThreshold(): Double = confirmationThreshold
+
     fun shouldClarify(confidenceScore: Double): Boolean = confidenceScore < confidenceClarificationThreshold
 
-    fun shouldRequireConfirmation(confidenceScore: Double): Boolean = confidenceScore < hardConfirmationThreshold
+    fun shouldRequireConfirmation(confidenceScore: Double): Boolean {
+        val threshold = confirmationThreshold
+        return threshold > 0.0 && confidenceScore < threshold
+    }
 }
 
 enum class ActionType {
