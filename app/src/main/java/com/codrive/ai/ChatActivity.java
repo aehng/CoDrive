@@ -32,6 +32,7 @@ import com.codrive.ai.model.ActionType;
 import com.codrive.ai.model.AgentDecision;
 import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
+import com.codrive.ai.orchestration.AgenticLoopCoordinator;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
 import com.codrive.ai.orchestration.IncrementalRequestManager;
@@ -50,9 +51,6 @@ import com.codrive.ai.vlm.InternVlModelLoader;
 import com.codrive.ai.vlm.InternVlRuntime;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
@@ -326,17 +324,7 @@ public class ChatActivity extends AppCompatActivity {
                 () -> identityDatabase.sessionContextDao(),
                 System::currentTimeMillis
         );
-        InferenceLoopRunner loopRunner = new InferenceLoopRunner(
-                LlmClientFactory.create(llmSettingsStore),
-                memorySearchTool,
-                3,
-                query -> {
-                    runOnUiThread(() -> {
-                        appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.chat_searching_memory));
-                        scrollTranscriptToBottom();
-                    });
-                }
-        );
+        InferenceLoopRunner loopRunner = new InferenceLoopRunner(LlmClientFactory.create(llmSettingsStore));
 
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;
         ChatTracerBulletOrchestrator orchestrator = new ChatTracerBulletOrchestrator(
@@ -350,109 +338,22 @@ public class ChatActivity extends AppCompatActivity {
         if (!llmSettingsStore.isAgenticBetaEnabled()) {
             result = orchestrator.run(sessionAwareCommand, pruningOutcome);
         } else {
-            result = runAgenticLoop(orchestrator, command, sessionAwareCommand, pruningOutcome);
+            AgenticLoopCoordinator agenticCoordinator = new AgenticLoopCoordinator(
+                    loopRunner::run,
+                    memorySearchTool,
+                    orchestrator,
+                    this::capturePruningOutcome,
+                    llmSettingsStore.getAgenticMaxIterations(),
+                    2_000L,
+                    query -> runOnUiThread(() -> {
+                        appendLine(getString(R.string.chat_codrive_prefix), getString(R.string.chat_searching_memory));
+                        scrollTranscriptToBottom();
+                    })
+            );
+            result = agenticCoordinator.run(command, pruningOutcome);
         }
         activeSessionManager.onDecision(result.getDecision(), result.getDidExecute());
         return result;
-    }
-
-    private TracerBulletResult runAgenticLoop(
-            ChatTracerBulletOrchestrator orchestrator,
-            String originalCommand,
-            String sessionAwareCommand,
-            PruningOutcome firstOutcome
-    ) {
-        int maxIterations = llmSettingsStore.getAgenticMaxIterations();
-        List<String> conversation = new ArrayList<>();
-        conversation.add("USER: " + originalCommand);
-        if (!TextUtils.equals(originalCommand, sessionAwareCommand)) {
-            conversation.add("USER_CONTEXT: " + sessionAwareCommand);
-        }
-        String loopPrompt = buildAgenticPrompt(conversation, null, 0, maxIterations);
-        PruningOutcome currentOutcome = firstOutcome;
-        TracerBulletResult lastResult = null;
-
-        for (int i = 0; i < maxIterations; i++) {
-            TracerBulletResult stepResult = orchestrator.run(loopPrompt, currentOutcome);
-            lastResult = stepResult;
-            conversation.add("ASSISTANT: " + sanitizeForPrompt(stepResult.getFinalFeedback()));
-            trimConversationIfNeeded(conversation);
-            if (!stepResult.getDidExecute()) {
-                if (stepResult.getDecision().getActionType() == ActionType.RESPOND && i < maxIterations - 1) {
-                    loopPrompt = buildAgenticPrompt(
-                            conversation,
-                            stepResult.getFinalFeedback(),
-                            i + 1,
-                            maxIterations
-                    );
-                    currentOutcome = capturePruningOutcome();
-                    continue;
-                }
-                return stepResult;
-            }
-
-            String outcome = stepResult.getExecutionResult() != null
-                    ? stepResult.getExecutionResult().getMessage()
-                    : stepResult.getFinalFeedback();
-            loopPrompt = buildAgenticPrompt(
-                    conversation,
-                    outcome,
-                    i + 1,
-                    maxIterations
-            );
-            currentOutcome = capturePruningOutcome();
-        }
-
-        if (lastResult != null) {
-            return new TracerBulletResult(
-                    "Agentic run reached max iterations. " + lastResult.getFinalFeedback(),
-                    lastResult.getDecision(),
-                    lastResult.getExecutionResult(),
-                    lastResult.getDidExecute()
-            );
-        }
-        return unexpectedFailureResult(new IllegalStateException("Agentic loop produced no result."));
-    }
-
-    private String buildAgenticPrompt(
-            List<String> conversation,
-            String lastOutcome,
-            int completed,
-            int maxIterations
-    ) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("AGENTIC_BETA_MODE=true\n");
-        builder.append(String.format(Locale.US, "COMPLETED_ITERATIONS=%d/%d\n", completed, maxIterations));
-        builder.append("CONVERSATION_MESSAGES (no prior ui_map snapshots):\n");
-        for (String message : conversation) {
-            builder.append("- ").append(sanitizeForPrompt(message)).append('\n');
-        }
-        if (!TextUtils.isEmpty(lastOutcome)) {
-            builder.append("LAST_OUTCOME=").append(sanitizeForPrompt(lastOutcome)).append('\n');
-        }
-        builder.append("Use only the current ui_map for grounding.\n");
-        builder.append("If this needs multiple steps, return one executable action at a time.\n");
-        builder.append("If task is complete, return FINISH or RESPOND. Return strict JSON only.");
-        return builder.toString();
-    }
-
-    private void trimConversationIfNeeded(List<String> conversation) {
-        int maxMessages = llmSettingsStore.isHistoryEnabled()
-                ? Math.max(1, llmSettingsStore.getHistoryDepth() * 2)
-                : 1;
-        while (conversation.size() > maxMessages) {
-            conversation.remove(0);
-        }
-    }
-
-    private String sanitizeForPrompt(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value
-                .replace('\n', ' ')
-                .replace('\r', ' ')
-                .trim();
     }
 
     private PruningOutcome capturePruningOutcome() {

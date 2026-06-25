@@ -44,7 +44,7 @@ class InferenceLoopRunnerTest {
     }
 
     @Test
-    fun runHandlesSearchMemoryThenReturnsTerminalAction() {
+    fun runReturnsSingleTurnDecisionWithoutInternalMemoryLoop() {
         val llm = FakeLlmClient(
             ArrayDeque(
                 listOf(
@@ -53,55 +53,32 @@ class InferenceLoopRunnerTest {
                         toolQuery = "selected",
                         confidenceScore = 0.9,
                     ),
-                    AgentDecision(
-                        actionType = ActionType.CLICK,
-                        targetIndex = 2,
-                        voiceFeedback = "Tapped",
-                        confidenceScore = 0.95,
-                    ),
                 )
             )
         )
 
-        val memoryTool = MemorySearchTool(
-            identityDaoProvider = { EmptyIdentityDao() },
-            sessionContextDaoProvider = { SessionDaoWithOneValue() },
-            nowProvider = { 1L },
-        )
-
-        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = memoryTool, maxTurns = 3)
+        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = null, maxTurns = 1)
         val decision = runner.run("tap next", sampleUiMap())
 
-        assertEquals(ActionType.CLICK, decision.actionType)
-        assertEquals(2, llm.prompts.size)
-        assertTrue(llm.prompts[1].contains("MEMORY_RESULT"))
-        assertTrue(llm.prompts[1].contains("Option A"))
+        assertEquals(ActionType.SEARCH_MEMORY, decision.actionType)
+        assertEquals(1, llm.prompts.size)
     }
 
     @Test
-    fun runFailsClosedWhenLoopExceedsMaxTurns() {
-        val llm = FakeLlmClient(
-            ArrayDeque(
-                listOf(
-                    AgentDecision(ActionType.SEARCH_MEMORY, toolQuery = "a", confidenceScore = 0.9),
-                    AgentDecision(ActionType.SEARCH_MEMORY, toolQuery = "b", confidenceScore = 0.9),
-                    AgentDecision(ActionType.SEARCH_MEMORY, toolQuery = "c", confidenceScore = 0.9),
-                )
-            )
-        )
+    fun runFallsClosedWhenTheInferenceThrowsRepeatedly() {
+        val llm = object : LlmClient {
+            var calls = 0
+            override fun infer(command: String, uiMap: PrunedUiMap): AgentDecision {
+                calls += 1
+                throw IllegalStateException("network down")
+            }
+        }
 
-        val memoryTool = MemorySearchTool(
-            identityDaoProvider = { EmptyIdentityDao() },
-            sessionContextDaoProvider = { SessionDaoWithOneValue() },
-            nowProvider = { 1L },
-        )
-
-        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = memoryTool, maxTurns = 2)
+        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = null, maxTurns = 1)
         val decision = runner.run("start", sampleUiMap())
 
         assertEquals(ActionType.FINISH, decision.actionType)
-        assertTrue(decision.requiresClarification())
-        assertEquals(2, llm.prompts.size)
+        assertTrue(decision.voiceFeedback.contains("trouble", ignoreCase = true))
     }
 
     private fun sampleUiMap(): PrunedUiMap = PrunedUiMap(

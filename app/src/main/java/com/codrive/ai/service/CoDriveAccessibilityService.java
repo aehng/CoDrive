@@ -8,6 +8,8 @@ import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import com.codrive.ai.orchestration.UiTransitionMonitor;
+
 public class CoDriveAccessibilityService extends AccessibilityService {
     private static final String TAG = "CoDriveAccessibility";
     private static volatile CoDriveAccessibilityService instance;
@@ -55,6 +57,7 @@ public class CoDriveAccessibilityService extends AccessibilityService {
                     }
                     latestExternalRoot = snapshot;
                 }
+                UiTransitionMonitor.signalChange();
             }
         } finally {
             currentRoot.recycle();

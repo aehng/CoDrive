@@ -37,12 +37,43 @@ class ChatTracerBulletOrchestrator @JvmOverloads constructor(
 
         registryBinder.bindRegistry(pruningOutcome.nodeRegistry)
         val decision = decisionRunner.apply(command, pruningOutcome.uiMap)
+        return runDecision(decision, pruningOutcome)
+    }
+
+    fun runDecision(decision: AgentDecision, pruningOutcome: PruningOutcome): TracerBulletResult {
+        if (pruningOutcome.isUnreadable) {
+            val message = pruningOutcome.unreadableMessage ?: "This screen is unreadable."
+            return TracerBulletResult(
+                finalFeedback = message,
+                decision = AgentDecision(
+                    actionType = ActionType.FINISH,
+                    voiceFeedback = message,
+                    confidenceScore = 0.0,
+                ),
+                executionResult = null,
+                didExecute = false,
+            )
+        }
 
         if (decision.actionType == ActionType.RESPOND) {
             val message = if (decision.voiceFeedback.isNotBlank()) {
                 decision.voiceFeedback
             } else {
                 "I am listening."
+            }
+            return TracerBulletResult(
+                finalFeedback = message,
+                decision = decision,
+                executionResult = null,
+                didExecute = false,
+            )
+        }
+
+        if (decision.actionType == ActionType.SEARCH_MEMORY) {
+            val message = if (decision.toolQuery.isNotBlank()) {
+                "Searching memory for ${decision.toolQuery.trim()}."
+            } else {
+                "Searching memory."
             }
             return TracerBulletResult(
                 finalFeedback = message,
