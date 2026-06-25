@@ -2,6 +2,7 @@ package com.codrive.ai.memory
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,6 +29,7 @@ class MemoryModelsTest {
         assertEquals("identity-1", entity.id)
         assertEquals("phone", entity.key)
         assertEquals("+1-555-0100", entity.value)
+        assertEquals("phone +1-555-0100", entity.semanticText())
     }
 
     @Test
@@ -42,6 +44,29 @@ class MemoryModelsTest {
         assertEquals("session-1", entity.id)
         assertEquals("page-choice", entity.taskKey)
         assertEquals("Option A", entity.value)
+        assertEquals("page-choice Option A", entity.semanticText())
+    }
+
+    @Test
+    fun memoryEmbeddingCodecRoundTripsFloats() {
+        val original = floatArrayOf(0.5f, -1.25f, 3.75f)
+        val encoded = MemoryEmbeddingCodec.encode(original)
+        val decoded = MemoryEmbeddingCodec.decode(encoded)
+
+        assertNotNull(decoded)
+        assertEquals(original.size, decoded!!.size)
+        assertEquals(original.toList(), decoded.toList())
+    }
+
+    @Test
+    fun hashingTextEmbedderProducesStableNonZeroVectors() {
+        val embedder = HashingTextEmbedder(dimensions = 64)
+        val first = embedder.embed("My address is 123 Main St")
+        val second = embedder.embed("My address is 123 Main St")
+
+        assertEquals(first.size, second.size)
+        assertTrue(first.any { it != 0f })
+        assertEquals(first.toList(), second.toList())
     }
 }
 

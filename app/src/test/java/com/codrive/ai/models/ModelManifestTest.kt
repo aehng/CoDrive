@@ -7,11 +7,12 @@ import org.junit.Test
 class ModelManifestTest {
     @Test
     fun allRequiredModels_containsExpectedEntries() {
-        assertEquals(8, ModelManifest.allRequiredModels.size)
+        assertEquals(9, ModelManifest.allRequiredModels.size)
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.VLM_LLM))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.VLM_PROJ))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.STT_MODEL))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.STT_TOKENS))
+        assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.STT_VAD))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.TTS_MODEL))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.TTS_CONFIG))
         assertTrue(ModelManifest.allRequiredModels.contains(ModelManifest.TTS_TOKENS))
@@ -37,9 +38,10 @@ class ModelManifestTest {
 
     @Test
     fun voiceRequiredModels_containsSherpaAssets() {
-        assertEquals(6, ModelManifest.voiceRequiredModels.size)
+        assertEquals(7, ModelManifest.voiceRequiredModels.size)
         assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.STT_MODEL))
         assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.STT_TOKENS))
+        assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.STT_VAD))
         assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.TTS_MODEL))
         assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.TTS_CONFIG))
         assertTrue(ModelManifest.voiceRequiredModels.contains(ModelManifest.TTS_TOKENS))

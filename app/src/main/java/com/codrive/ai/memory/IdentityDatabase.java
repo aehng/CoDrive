@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase;
 
 @Database(
         entities = {IdentityEntity.class, SessionContextEntity.class},
-        version = 1,
+        version = 2,
         exportSchema = false
 )
 public abstract class IdentityDatabase extends RoomDatabase {

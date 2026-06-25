@@ -34,6 +34,7 @@ import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.AgenticLoopCoordinator;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
+import com.codrive.ai.orchestration.MemoryCommandHandler;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
 import com.codrive.ai.orchestration.IncrementalRequestManager;
 import com.codrive.ai.orchestration.Tier1NavigationDirective;
@@ -95,7 +96,7 @@ public class ChatActivity extends AppCompatActivity {
                 getApplicationContext(),
                 IdentityDatabase.class,
                 "codrive_identity.db"
-        ).build();
+        ).fallbackToDestructiveMigration().build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
         activeSessionManager = new ActiveSessionManager(
@@ -324,6 +325,12 @@ public class ChatActivity extends AppCompatActivity {
                 () -> identityDatabase.sessionContextDao(),
                 System::currentTimeMillis
         );
+        MemoryCommandHandler memoryCommandHandler = new MemoryCommandHandler(memorySearchTool);
+        TracerBulletResult memoryResult = memoryCommandHandler.tryHandle(command);
+        if (memoryResult != null) {
+            return memoryResult;
+        }
+
         InferenceLoopRunner loopRunner = new InferenceLoopRunner(LlmClientFactory.create(llmSettingsStore));
 
         BiFunction<String, com.codrive.ai.model.PrunedUiMap, AgentDecision> decisionRunner = loopRunner::run;

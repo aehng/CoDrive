@@ -26,6 +26,11 @@ class ModelReadinessTest {
         sttTokens.writeBytes(ByteArray(ModelManifest.STT_TOKENS.sizeBytes.toInt()))
         storage.markVerified(ModelManifest.STT_TOKENS, ModelManifest.STT_TOKENS.sha256)
 
+        val sttVad = storage.destinationFile(ModelManifest.STT_VAD)
+        sttVad.parentFile?.mkdirs()
+        sttVad.writeBytes(ByteArray(ModelManifest.STT_VAD.sizeBytes.toInt()))
+        storage.markVerified(ModelManifest.STT_VAD, ModelManifest.STT_VAD.sha256)
+
         assertTrue(ModelReadiness.hasSttModels(storage))
     }
 
@@ -37,12 +42,15 @@ class ModelReadinessTest {
         val sttModel = storage.destinationFile(ModelManifest.STT_MODEL)
         sttModel.parentFile?.mkdirs()
         sttModel.writeText("")
-        storage.markVerified(ModelManifest.STT_MODEL, ModelManifest.STT_MODEL.sha256)
 
         val sttTokens = storage.destinationFile(ModelManifest.STT_TOKENS)
         sttTokens.parentFile?.mkdirs()
         sttTokens.writeText("")
-        storage.markVerified(ModelManifest.STT_TOKENS, ModelManifest.STT_TOKENS.sha256)
+
+        val sttVad = storage.destinationFile(ModelManifest.STT_VAD)
+        sttVad.parentFile?.mkdirs()
+        sttVad.writeBytes(ByteArray(ModelManifest.STT_VAD.sizeBytes.toInt()))
+        storage.markVerified(ModelManifest.STT_VAD, ModelManifest.STT_VAD.sha256)
 
         assertFalse(ModelReadiness.hasSttModels(storage))
     }

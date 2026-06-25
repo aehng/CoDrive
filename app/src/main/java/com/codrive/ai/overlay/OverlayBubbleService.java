@@ -50,6 +50,7 @@ import com.codrive.ai.model.ExecutionResult;
 import com.codrive.ai.orchestration.ActiveSessionManager;
 import com.codrive.ai.orchestration.AgenticLoopCoordinator;
 import com.codrive.ai.orchestration.ChatTracerBulletOrchestrator;
+import com.codrive.ai.orchestration.MemoryCommandHandler;
 import com.codrive.ai.orchestration.InferenceLoopRunner;
 import com.codrive.ai.orchestration.IncrementalRequestManager;
 import com.codrive.ai.orchestration.Tier1NavigationDirective;
@@ -181,7 +182,7 @@ public class OverlayBubbleService extends Service {
                 getApplicationContext(),
                 IdentityDatabase.class,
                 "codrive_identity.db"
-        ).build();
+        ).fallbackToDestructiveMigration().build();
         llmSettingsStore = LlmSettingsStore.create(getApplicationContext());
         voiceSettingsStore = VoiceSettingsStore.create(getApplicationContext());
         // Hard default every overlay session: main loudspeaker.
@@ -608,6 +609,11 @@ public class OverlayBubbleService extends Service {
                 () -> identityDatabase.sessionContextDao(),
                 System::currentTimeMillis
         );
+        MemoryCommandHandler memoryCommandHandler = new MemoryCommandHandler(memorySearchTool);
+        TracerBulletResult memoryResult = memoryCommandHandler.tryHandle(command);
+        if (memoryResult != null) {
+            return memoryResult;
+        }
         // Create LLM client and orchestrator. We attach a watchdog that will call
         // `llmClient.cancel()` if the worker thread is interrupted so in-flight
         // OkHttp calls (or other cancellable transports) are aborted promptly.

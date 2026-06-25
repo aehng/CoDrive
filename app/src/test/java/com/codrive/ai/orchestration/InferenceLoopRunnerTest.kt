@@ -57,7 +57,7 @@ class InferenceLoopRunnerTest {
             )
         )
 
-        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = null, maxTurns = 1)
+        val runner = InferenceLoopRunner(llmClient = llm, maxAttempts = 1, retryDelayMs = 0L)
         val decision = runner.run("tap next", sampleUiMap())
 
         assertEquals(ActionType.SEARCH_MEMORY, decision.actionType)
@@ -74,7 +74,7 @@ class InferenceLoopRunnerTest {
             }
         }
 
-        val runner = InferenceLoopRunner(llmClient = llm, memorySearchTool = null, maxTurns = 1)
+        val runner = InferenceLoopRunner(llmClient = llm, maxAttempts = 1, retryDelayMs = 0L)
         val decision = runner.run("start", sampleUiMap())
 
         assertEquals(ActionType.FINISH, decision.actionType)

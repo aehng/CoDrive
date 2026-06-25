@@ -1,17 +1,14 @@
 package com.codrive.ai.orchestration
 
 import com.codrive.ai.contracts.LlmClient
-import com.codrive.ai.memory.MemorySearchTool
 import com.codrive.ai.model.ActionType
 import com.codrive.ai.model.AgentDecision
 import com.codrive.ai.model.PrunedUiMap
-import java.util.function.Consumer
 
 class InferenceLoopRunner @JvmOverloads constructor(
     private val llmClient: LlmClient,
-    private val memorySearchTool: MemorySearchTool? = null,
-    private val maxTurns: Int = 1,
-    private val onMemorySearch: Consumer<String>? = null,
+    private val maxAttempts: Int = 3,
+    private val retryDelayMs: Long = 6500L,
 ) {
     fun run(initialCommand: String, uiMap: PrunedUiMap): AgentDecision {
         // Single-step inference with retry on transient transport failures.
@@ -21,22 +18,18 @@ class InferenceLoopRunner @JvmOverloads constructor(
                 return llmClient.infer(initialCommand, uiMap)
             } catch (e: Exception) {
                 attempt += 1
-                if (attempt > 3) {
+                if (attempt >= maxAttempts) {
                     return AgentDecision(
                         actionType = ActionType.FINISH,
                         targetIndex = -1,
                         textToType = "",
                         toolQuery = "",
-                        voiceFeedback = if (memorySearchTool == null) {
-                            "I'm having trouble connecting right now."
-                        } else {
-                            "I'm having trouble connecting right now."
-                        },
+                        voiceFeedback = "I'm having trouble connecting right now.",
                         confidenceScore = 0.0,
                     )
                 }
                 try {
-                    Thread.sleep(6500L)
+                    Thread.sleep(retryDelayMs)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                 }
